@@ -1,0 +1,77 @@
+import fs from 'fs';
+import { scanLabel, getScanHistory } from './src/api/labelCheckApi.js';
+import { mapBackendScanToProduct } from './src/api/scanMapper.js';
+
+function detectImageMimeType(buffer, fallbackMime = '', filename = '') {
+  const bytes = new Uint8Array(buffer);
+  if (bytes.length >= 3 && bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+    return 'image/jpeg';
+  }
+  if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+    return 'image/png';
+  }
+  if (bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+      bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+    return 'image/webp';
+  }
+  if (fallbackMime && fallbackMime.startsWith('image/')) return fallbackMime;
+  if (/\.png$/i.test(filename)) return 'image/png';
+  if (/\.webp$/i.test(filename)) return 'image/webp';
+  return 'image/jpeg';
+}
+
+async function testMobileSimulation() {
+  console.log('=== VERIFYING MOBILE CAMERA & REPEATED SCAN LIFECYCLE ===');
+  const buffer = fs.readFileSync('test_food_label.png');
+
+  // Test 1: Simulating mobile camera/gallery file where Android provides empty mime type ("")
+  console.log('\n[TEST 1] Android capture with empty mime type ("")');
+  const rawFile1 = new File([buffer], 'camera_shot_1.png', { type: '' });
+  
+  // Apply our safe in-memory buffering + magic byte MIME detection
+  const arrayBuffer1 = await rawFile1.arrayBuffer();
+  const mime1 = detectImageMimeType(arrayBuffer1, rawFile1.type, rawFile1.name);
+  const safeFile1 = new File([new Blob([arrayBuffer1], { type: mime1 })], rawFile1.name, { type: mime1 });
+  console.log('Buffered File 1:', safeFile1.name, 'Size:', safeFile1.size, 'Detected Mime:', safeFile1.type);
+
+  const res1 = await scanLabel(safeFile1);
+  console.log('Result 1 OK! scanId:', res1.scanId, 'Score:', res1.compliance.overallScore);
+  const prod1 = mapBackendScanToProduct(res1);
+  console.log('Mapped Result 1: Status =', prod1.status, 'Checks =', prod1.checks.length);
+
+  // Test 2: Second scan with same filename and empty mime type
+  console.log('\n[TEST 2] Second scan (Scan Another Product -> Camera photo again)');
+  const rawFile2 = new File([buffer], 'camera_shot_1.png', { type: '' });
+  const arrayBuffer2 = await rawFile2.arrayBuffer();
+  const mime2 = detectImageMimeType(arrayBuffer2, rawFile2.type, rawFile2.name);
+  const safeFile2 = new File([new Blob([arrayBuffer2], { type: mime2 })], rawFile2.name, { type: mime2 });
+  
+  const res2 = await scanLabel(safeFile2);
+  console.log('Result 2 OK! scanId:', res2.scanId, 'Score:', res2.compliance.overallScore);
+  const prod2 = mapBackendScanToProduct(res2);
+  console.log('Mapped Result 2: Status =', prod2.status, 'Checks =', prod2.checks.length);
+
+  // Test 3: Third scan
+  console.log('\n[TEST 3] Third scan (Scan Another Product -> 3rd photo)');
+  const rawFile3 = new File([buffer], 'camera_shot_2.png', { type: '' });
+  const arrayBuffer3 = await rawFile3.arrayBuffer();
+  const mime3 = detectImageMimeType(arrayBuffer3, rawFile3.type, rawFile3.name);
+  const safeFile3 = new File([new Blob([arrayBuffer3], { type: mime3 })], rawFile3.name, { type: mime3 });
+
+  const res3 = await scanLabel(safeFile3);
+  console.log('Result 3 OK! scanId:', res3.scanId, 'Score:', res3.compliance.overallScore);
+  const prod3 = mapBackendScanToProduct(res3);
+  console.log('Mapped Result 3: Status =', prod3.status, 'Checks =', prod3.checks.length);
+
+  // Assertions
+  if (res1.scanId === res2.scanId || res2.scanId === res3.scanId) {
+    throw new Error('Scan IDs must be distinct!');
+  }
+
+  console.log('\n=== ALL 3 CONSECUTIVE MOBILE SCANS SUCCEEDED! ===');
+}
+
+testMobileSimulation().catch(err => {
+  console.error('Mobile test failed:', err);
+  process.exit(1);
+});
