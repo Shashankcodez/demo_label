@@ -259,7 +259,9 @@ public class ScanService {
         }
 
         boolean isAiEnabled = aiProperties != null && aiProperties.isEnabled();
-        String aiModel = isAiEnabled ? aiProperties.getModel() : null;
+        String aiModel = (aiResult != null && aiResult.modelName() != null && !aiResult.modelName().isBlank())
+                ? aiResult.modelName()
+                : (isAiEnabled ? aiProperties.getModel() : null);
 
         // 6. Persist completed scan record to database
         Instant createdAt = persistScanRecord(
@@ -541,7 +543,7 @@ public class ScanService {
                     throw new InvalidImageException("File is too small to be a valid WebP image");
                 }
                 if (!startsWith(bytes, RIFF_HEADER)) {
-                    throw new InvalidImageException("WebP missing RIFF header");
+                    throw new InvalidImageException("File content does not match WebP RIFF container header");
                 }
                 byte[] webpCheck = Arrays.copyOfRange(bytes, 8, 12);
                 if (!Arrays.equals(webpCheck, WEBP_HEADER)) {

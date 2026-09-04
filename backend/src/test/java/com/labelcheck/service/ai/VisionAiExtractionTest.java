@@ -252,4 +252,178 @@ class VisionAiExtractionTest {
         assertThat(merged.extractionStatus()).isEqualTo("IMAGE_QUALITY_LOW");
         assertThat(merged.labelData().countDetectedFields()).isEqualTo(0);
     }
+
+    @Test
+    @DisplayName("7. GeminiVisionLabelExtractor parses generateContent candidate response with markdown codeblock")
+    void testGeminiParser_parsesGenerateContentResponse() {
+        GeminiVisionLabelExtractor geminiExtractor = new GeminiVisionLabelExtractor(aiProperties, objectMapper);
+        String geminiJson = """
+                {
+                  "candidates": [
+                    {
+                      "content": {
+                        "parts": [
+                          {
+                            "text": "```json\\n{\\n  \\"overallConfidence\\": 0.96,\\n  \\"productName\\": { \\"value\\": \\"REFINED SUNFLOWER OIL\\", \\"confidence\\": 0.98, \\"evidence\\": \\"Front center label\\" },\\n  \\"brand\\": { \\"value\\": \\"SUNFLOWER\\", \\"confidence\\": 0.90, \\"evidence\\": \\"Brand heading\\" },\\n  \\"netQuantity\\": { \\"value\\": \\"1 Litre\\", \\"confidence\\": 0.96, \\"evidence\\": \\"NET QUANTITY AT 30 C : 1 Litre\\" },\\n  \\"mrp\\": { \\"value\\": \\"₹100/-\\", \\"confidence\\": 0.97, \\"evidence\\": \\"M.R.P. : ₹100/- (Inclusive of all Taxes)\\" },\\n  \\"mrpIncludesTaxes\\": { \\"value\\": \\"true\\", \\"confidence\\": 0.95, \\"evidence\\": \\"Inclusive of all Taxes\\" },\\n  \\"batchNumber\\": { \\"value\\": \\"PS200\\", \\"confidence\\": 0.95, \\"evidence\\": \\"Batch No. : PS200\\" },\\n  \\"manufacturedOrPackedDate\\": { \\"value\\": \\"July 13, 2017\\", \\"confidence\\": 0.95, \\"evidence\\": \\"Packed on : July 13, 2017\\" },\\n  \\"bestBeforeOrExpiry\\": { \\"value\\": \\"nine months from packaging\\", \\"confidence\\": 0.95, \\"evidence\\": \\"Best before nine months from packaging\\" },\\n  \\"fssaiLicenseNumber\\": { \\"value\\": \\"12345678912345\\", \\"confidence\\": 0.94, \\"evidence\\": \\"LIC. No. 12345678912345\\" },\\n  \\"fssaiStatus\\": { \\"value\\": \\"NUMBER_DETECTED\\", \\"confidence\\": 0.95, \\"evidence\\": \\"14 digit FSSAI lic\\" },\\n  \\"manufacturer\\": { \\"value\\": null, \\"confidence\\": 0.0, \\"evidence\\": null },\\n  \\"ingredients\\": { \\"value\\": \\"Refined Sunflower Oil, Permitted Antioxidants, Vitamin A, Vitamin D\\", \\"confidence\\": 0.92, \\"evidence\\": \\"INGREDIENTS block\\" }\\n}\\n```"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+                """;
+
+        AiLabelExtractionResult result = geminiExtractor.parseGeminiResponse(geminiJson);
+
+        assertThat(result).isNotNull();
+        assertThat(result.status()).isEqualTo(AiExtractionStatus.AI_SUCCESS);
+        assertThat(result.extractionSource()).isEqualTo("Gemini Vision");
+        assertThat(result.label().productName().value()).isEqualTo("REFINED SUNFLOWER OIL");
+        assertThat(result.label().mrp().value()).isEqualTo("100");
+        assertThat(result.label().batchNumber().value()).isEqualTo("PS200");
+        assertThat(result.label().netQuantity().value()).isEqualTo("1 Litre");
+        assertThat(result.label().manufacturedOrPackedDate().value()).isEqualTo("July 13, 2017");
+        assertThat(result.label().bestBeforeOrExpiry().value()).contains("nine months");
+        // Ensure manufacturer without value is null rather than "Manufactured and"
+        assertThat(result.label().manufacturer().value()).isNull();
+    }
+
+    @Test
+    @DisplayName("8. PrimaryFallbackVisionLabelExtractor disables Groq fallback during Gemini primary scan path")
+    void testPrimaryFallback_doesNotCallGroqWhenGeminiFails(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        java.nio.file.Path testImg = tempDir.resolve("test.png");
+        java.nio.file.Files.write(testImg, new byte[] { (byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+
+        GeminiVisionLabelExtractor mockGemini = org.mockito.Mockito.mock(GeminiVisionLabelExtractor.class);
+        GroqVisionLabelExtractor mockGroq = org.mockito.Mockito.mock(GroqVisionLabelExtractor.class);
+
+        org.mockito.Mockito.when(mockGemini.isEnabled()).thenReturn(true);
+        org.mockito.Mockito.when(mockGemini.extract(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(AiLabelExtractionResult.failed(AiExtractionStatus.AI_FAILED_TESSERACT_FALLBACK, "gemini-3.6-flash", "Gemini 429 rate limit"));
+
+        AiProperties testProps = new AiProperties();
+        testProps.setProvider("gemini");
+
+        PrimaryFallbackVisionLabelExtractor orchestrator = new PrimaryFallbackVisionLabelExtractor(
+                mockGemini, mockGroq, testProps
+        );
+
+        AiLabelExtractionResult result = orchestrator.extract(testImg, "image/png");
+
+        assertThat(result).isNotNull();
+        assertThat(result.status()).isEqualTo(AiExtractionStatus.AI_FAILED_TESSERACT_FALLBACK);
+        // Groq must NOT be invoked when provider is gemini
+        org.mockito.Mockito.verify(mockGemini, org.mockito.Mockito.times(1)).extract(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.verify(mockGroq, org.mockito.Mockito.never()).extract(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("9. PrimaryFallbackVisionLabelExtractor executes Groq when provider is explicitly groq")
+    void testPrimaryFallback_executesGroqWhenProviderIsGroq(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        java.nio.file.Path testImg = tempDir.resolve("test.png");
+        java.nio.file.Files.write(testImg, new byte[] { (byte)0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+
+        GeminiVisionLabelExtractor mockGemini = org.mockito.Mockito.mock(GeminiVisionLabelExtractor.class);
+        GroqVisionLabelExtractor mockGroq = org.mockito.Mockito.mock(GroqVisionLabelExtractor.class);
+
+        org.mockito.Mockito.when(mockGroq.isEnabled()).thenReturn(true);
+        StructuredAiLabel groqLabel = new StructuredAiLabel(
+                0.92,
+                FieldExtraction.of("Groq Product", 0.95, "Title"),
+                FieldExtraction.empty(),
+                FieldExtraction.of("500 g", 0.95, "500g"),
+                FieldExtraction.of("100", 0.95, "MRP 100"),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                List.of(),
+                List.of()
+        );
+        org.mockito.Mockito.when(mockGroq.extract(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(AiLabelExtractionResult.success(0.92, "Groq Vision", "qwen/qwen3.6-27b", groqLabel));
+
+        AiProperties testProps = new AiProperties();
+        testProps.setProvider("groq");
+
+        PrimaryFallbackVisionLabelExtractor orchestrator = new PrimaryFallbackVisionLabelExtractor(
+                mockGemini, mockGroq, testProps
+        );
+
+        AiLabelExtractionResult result = orchestrator.extract(testImg, "image/png");
+
+        assertThat(result).isNotNull();
+        assertThat(result.extractionSource()).isEqualTo("Groq Vision");
+        assertThat(result.label().productName().value()).isEqualTo("Groq Product");
+        org.mockito.Mockito.verify(mockGroq, org.mockito.Mockito.times(1)).extract(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("10. MergeService rejects heading fragments as productName and manufacturerName")
+    void testMerge_rejectsHeadingFragments() {
+        StructuredAiLabel aiLabel = new StructuredAiLabel(
+                0.95,
+                FieldExtraction.of("Manufactured and Packed at", 0.85, "Header text"),
+                FieldExtraction.empty(),
+                FieldExtraction.of("1 Litre", 0.95, "Quantity"),
+                FieldExtraction.of("100", 0.95, "Price"),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.of("PS200", 0.90, "Batch"),
+                FieldExtraction.of("July 13, 2017", 0.95, "Packed on"),
+                FieldExtraction.of("nine months from packaging", 0.95, "Best before"),
+                FieldExtraction.of("1234567871234567", 0.85, "Lic No"),
+                FieldExtraction.of("TEXT_PRESENT_NUMBER_NEEDS_REVIEW", 0.85, "Review needed"),
+                FieldExtraction.of("Manufactured and", 0.80, "Heading"),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.of("7871234567", 0.90, "Phone"),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                FieldExtraction.empty(),
+                List.of(),
+                List.of()
+        );
+
+        AiLabelExtractionResult aiResult = AiLabelExtractionResult.success(0.95, "Gemini Vision", "gemini-3.6-flash", aiLabel);
+
+        StructuredLabelData ocrData = new StructuredLabelData(
+                "Manufactured And Packed At", null, "1 Litre", "2100", null, null,
+                "Manufactured and", null, null, null, null, null, null, null, null, null, null,
+                "raw text", null, "NOT_DETECTED"
+        );
+
+        ExtractionMergeService.MergedResult merged = mergeService.merge(aiResult, ocrData, "raw text", false);
+
+        // Assert productName is NOT the heading fragment
+        assertThat(merged.labelData().productName()).isNull();
+        // Assert manufacturerName is NOT the heading fragment
+        assertThat(merged.labelData().manufacturerName()).isNull();
+        // Assert MRP preferred visual 100 over OCR 2100
+        assertThat(merged.labelData().mrp()).isEqualTo("100");
+        // Assert FSSAI status
+        assertThat(merged.labelData().fssaiStatus()).isEqualTo("TEXT_PRESENT_NUMBER_NEEDS_REVIEW");
+    }
 }

@@ -27,3 +27,12 @@ dist-ssr
 *.sw?
 backend/data/
 backend/target/
+backend/uploads/
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/

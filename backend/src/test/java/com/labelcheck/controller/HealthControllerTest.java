@@ -58,5 +58,27 @@ class HealthControllerTest {
                 .andExpect(jsonPath("$.apiKey").doesNotExist())
                 .andExpect(jsonPath("$.key").doesNotExist());
     }
+
+    @Test
+    @DisplayName("GET /api/v1/health returns aiEnabled=true, aiProvider=gemini, and model=gemini-3.6-flash")
+    void getHealth_whenGeminiEnabled_shouldReturnGeminiMetadata() throws Exception {
+        when(aiProperties.isEnabled()).thenReturn(true);
+        when(aiProperties.isGeminiConfigured()).thenReturn(true);
+        when(aiProperties.getApiKey()).thenReturn("AIzaSyFakeGeminiApiKey123");
+        when(aiProperties.getProvider()).thenReturn("gemini");
+        when(aiProperties.getModel()).thenReturn("gemini-3.6-flash");
+
+        mockMvc.perform(get("/api/v1/health")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.aiEnabled").value(true))
+                .andExpect(jsonPath("$.aiProvider").value("gemini"))
+                .andExpect(jsonPath("$.aiModel").value("gemini-3.6-flash"))
+                .andExpect(jsonPath("$.apiKey").doesNotExist())
+                .andExpect(jsonPath("$.key").doesNotExist())
+                .andExpect(jsonPath("$.geminiApiKey").doesNotExist());
+    }
 }
 

@@ -206,6 +206,15 @@ class RealWorldOcrAccuracyTest {
         Path sourcePath = tempDir.resolve("test_label.png");
         ImageIO.write(img, "PNG", sourcePath.toFile());
 
+        // Clean any pre-existing leftover files in systemTempDir from earlier test suites
+        Path systemTempDir = Path.of(System.getProperty("java.io.tmpdir"));
+        try (Stream<Path> existingFiles = Files.list(systemTempDir)) {
+            existingFiles.filter(p -> p.getFileName().toString().startsWith("labelcheck_ocr_"))
+                    .forEach(p -> {
+                        try { Files.deleteIfExists(p); } catch (Exception ignored) {}
+                    });
+        }
+
         // Perform OCR
         ocrService.extractText(sourcePath);
 
@@ -213,7 +222,6 @@ class RealWorldOcrAccuracyTest {
         assertThat(Files.exists(sourcePath)).isTrue();
 
         // Check that no temporary files prefixed with labelcheck_ocr_ remain in temp directory
-        Path systemTempDir = Path.of(System.getProperty("java.io.tmpdir"));
         try (Stream<Path> tempFiles = Files.list(systemTempDir)) {
             long remainingFiles = tempFiles
                     .filter(p -> p.getFileName().toString().startsWith("labelcheck_ocr_"))

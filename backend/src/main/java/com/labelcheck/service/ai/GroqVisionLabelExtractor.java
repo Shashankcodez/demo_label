@@ -10,7 +10,6 @@ import com.labelcheck.dto.ai.FieldExtraction;
 import com.labelcheck.dto.ai.StructuredAiLabel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -29,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Production Groq Vision AI extractor powered by qwen/qwen3.6-27b.
+ * Groq Vision AI extractor powered by qwen/qwen3.6-27b (Fallback Vision Provider).
  * Connects directly to Groq's OpenAI-compatible multimodal endpoint:
  * https://api.groq.com/openai/v1/chat/completions
  *
@@ -42,8 +41,7 @@ import java.util.Map;
  *
  * The API key is stored only on the backend (GROQ_API_KEY) and is NEVER logged or exposed to the client.
  */
-@Service
-@Primary
+@Service("groqVisionExtractor")
 public class GroqVisionLabelExtractor implements VisionLabelExtractor {
 
     private static final Logger log = LoggerFactory.getLogger(GroqVisionLabelExtractor.class);
@@ -71,10 +69,10 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
                - productName: Prominent product title text (e.g., "Apple Slice"). Do NOT confuse with slogans, marketing blurbs, or nutrition headers.
                - brand: Brand name or logo brand text.
             2. NET QUANTITY:
-               - Look for Net Qty, Net Weight, Net Wt, Net Volume, and units (g, gm, kg, ml, l, pcs).
+               - Look for Net Qty, Net Weight, Net Wt, Net Volume, and units (g, gm, kg, ml, l, Litre, pcs).
             3. MRP & TAXES:
                - Look for semantic context: MRP, MAX RETAIL PRICE, MAXIMUM RETAIL PRICE, INCL ALL TAXES.
-               - mrp: Extract the numeric price only (e.g., "150"). NEVER confuse MRP with calories, protein, carbs, fat, sugar, batch numbers, phone numbers, or dates.
+               - mrp: Extract the numeric price only (e.g., "150", "100"). NEVER confuse MRP with calories, protein, carbs, fat, sugar, batch numbers, phone numbers, or dates.
                - If MRP is unclear or not present, set mrp.value = null.
                - mrpIncludesTaxes: "true" if text indicates inclusive of taxes (e.g. "Incl. of all taxes"), "false" if exclusive, or null.
                - unitSalePrice: Unit sale price if explicitly declared (e.g., "₹0.60/g").
@@ -82,6 +80,7 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
                - manufacturedOrPackedDate: Date with context MFD, MFG, PKD, PACKED, PACKED ON, MANUFACTURED.
                - bestBeforeOrExpiry: Date with context BEST BEFORE, BB, EXP, EXPIRY, USE BY.
                - NEVER confuse nutrition lines (e.g. "Protein 0.5 Gms") with a date. If meaning is ambiguous, set to null.
+               - Preserve phrases such as "Best before nine months from packaging" as bestBefore.
             5. BATCH NUMBER:
                - batchNumber: Batch, Lot, B.No code.
             6. FSSAI:
@@ -89,7 +88,7 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
                - fssaiStatus: "NUMBER_DETECTED" (if 14-digit number), "APPLIED_FOR" (if words "Applied For"), "TEXT_PRESENT_NUMBER_NOT_DETECTED", or "NOT_DETECTED".
             7. MANUFACTURER / PACKER / ADDRESS:
                - Support explicit labels: Manufactured by, Packed by, Marketed by, Imported by.
-               - Do not invent entity relationships.
+               - Do not invent entity relationships. If only header exists without entity, return null.
                - address: Complete visible physical postal address with PIN code if present. Preserve full multiline text.
             8. CONSUMER CARE:
                - phone: Recognize Indian phone formats (+91 8888 720 520, 8888720520, 08888 720 520) with labels Phone, Ph, Mobile, Contact, Call, Customer Care.
@@ -140,8 +139,8 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
     private final HttpClient httpClient;
 
     public GroqVisionLabelExtractor(AiProperties aiProperties, ObjectMapper objectMapper) {
-        this.aiProperties = aiProperties;
-        this.objectMapper = objectMapper;
+        this.aiProperties = aiProperties != null ? aiProperties : new AiProperties();
+        this.objectMapper = objectMapper != null ? objectMapper : new ObjectMapper();
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
@@ -149,24 +148,27 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
 
     @Override
     public boolean isEnabled() {
-        return aiProperties.isEnabled() && StringUtils.hasText(aiProperties.getApiKey());
+        return aiProperties.isEnabled() && StringUtils.hasText(aiProperties.getGroqApiKey());
     }
 
     @Override
     public AiLabelExtractionResult extract(Path imagePath, String contentType) {
+        String modelName = aiProperties.getGroqModel();
+        String apiKey = aiProperties.getGroqApiKey();
+
         if (!isEnabled()) {
-            log.info("Vision AI extraction requested but disabled or unconfigured (missing GROQ_API_KEY). Falling back to local OCR.");
+            log.info("Groq Vision extraction requested but disabled or unconfigured (missing GROQ_API_KEY). Falling back to local OCR.");
             return AiLabelExtractionResult.failed(
                     AiExtractionStatus.OCR_AVAILABLE_EXTRACTION_LIMITED,
-                    aiProperties.getModel(),
-                    "Vision AI is disabled or GROQ_API_KEY is not configured"
+                    modelName,
+                    "Groq Vision is disabled or GROQ_API_KEY is not configured"
             );
         }
 
         if (imagePath == null || !Files.exists(imagePath)) {
             return AiLabelExtractionResult.failed(
                     AiExtractionStatus.TOTAL_EXTRACTION_FAILURE,
-                    aiProperties.getModel(),
+                    modelName,
                     "Image file does not exist on disk"
             );
         }
@@ -178,7 +180,7 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
             log.error("Failed to read image bytes for Groq Vision AI request: {}", e.getMessage());
             return AiLabelExtractionResult.failed(
                     AiExtractionStatus.AI_FAILED_TESSERACT_FALLBACK,
-                    aiProperties.getModel(),
+                    modelName,
                     "Unable to read image bytes from disk"
             );
         }
@@ -194,14 +196,14 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
             log.error("Failed to construct Groq Vision AI JSON payload: {}", e.getMessage());
             return AiLabelExtractionResult.failed(
                     AiExtractionStatus.AI_FAILED_TESSERACT_FALLBACK,
-                    aiProperties.getModel(),
+                    modelName,
                     "Failed to construct request payload"
             );
         }
 
-        String endpoint = aiProperties.getBaseUrl() + "/chat/completions";
+        String endpoint = aiProperties.getGroqBaseUrl() + "/chat/completions";
         log.info("Dispatching Groq Vision AI extraction request: endpoint=[{}], model=[{}], imageSize=[{} KB]",
-                endpoint, aiProperties.getModel(), imageBytes.length / 1024);
+                endpoint, modelName, imageBytes.length / 1024);
 
         int maxAttempts = 1 + aiProperties.getMaxRetries();
         long startTime = System.currentTimeMillis();
@@ -211,7 +213,7 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
                 HttpRequest request = HttpRequest.newBuilder()
                         .uri(URI.create(endpoint))
                         .timeout(Duration.ofSeconds(aiProperties.getTimeoutSeconds()))
-                        .header("Authorization", "Bearer " + aiProperties.getApiKey())
+                        .header("Authorization", "Bearer " + apiKey.trim())
                         .header("Content-Type", "application/json")
                         .header("Accept", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(requestPayload))
@@ -232,7 +234,7 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
                     log.warn("Groq Vision AI authentication failed (HTTP {}). Check GROQ_API_KEY.", statusCode);
                     return AiLabelExtractionResult.failed(
                             AiExtractionStatus.AI_FAILED_TESSERACT_FALLBACK,
-                            aiProperties.getModel(),
+                            modelName,
                             "Groq authorization failed (HTTP " + statusCode + "). Using local OCR fallback."
                     );
                 }
@@ -245,7 +247,7 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
                     }
                     return AiLabelExtractionResult.failed(
                             AiExtractionStatus.AI_FAILED_TESSERACT_FALLBACK,
-                            aiProperties.getModel(),
+                            modelName,
                             "Groq rate limit reached. Local OCR fallback was used."
                     );
                 }
@@ -258,23 +260,23 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
                     }
                     return AiLabelExtractionResult.failed(
                             AiExtractionStatus.AI_FAILED_TESSERACT_FALLBACK,
-                            aiProperties.getModel(),
+                            modelName,
                             "Groq server error (HTTP " + statusCode + "). Local OCR fallback was used."
                     );
                 }
 
                 log.warn("Groq Vision AI request returned unexpected HTTP status {}: {}", statusCode, response.body());
                 return AiLabelExtractionResult.failed(
-                    AiExtractionStatus.AI_FAILED_TESSERACT_FALLBACK,
-                    aiProperties.getModel(),
-                    "Groq returned HTTP " + statusCode + ". Local OCR fallback was used."
+                        AiExtractionStatus.AI_FAILED_TESSERACT_FALLBACK,
+                        modelName,
+                        "Groq returned HTTP " + statusCode + ". Local OCR fallback was used."
                 );
 
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
                 return AiLabelExtractionResult.failed(
                         AiExtractionStatus.AI_FAILED_TESSERACT_FALLBACK,
-                        aiProperties.getModel(),
+                        modelName,
                         "Groq request interrupted"
                 );
             } catch (Exception ex) {
@@ -289,7 +291,7 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
                 }
                 return AiLabelExtractionResult.failed(
                         AiExtractionStatus.AI_FAILED_TESSERACT_FALLBACK,
-                        aiProperties.getModel(),
+                        modelName,
                         "Groq network error: " + ex.getClass().getSimpleName() + ". Local OCR fallback was used."
                 );
             }
@@ -297,14 +299,14 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
 
         return AiLabelExtractionResult.failed(
                 AiExtractionStatus.AI_FAILED_TESSERACT_FALLBACK,
-                aiProperties.getModel(),
+                modelName,
                 "Groq Vision AI extraction could not be completed. Local OCR fallback was used."
         );
     }
 
     private String buildRequestBody(String dataUri) throws Exception {
         Map<String, Object> body = new HashMap<>();
-        body.put("model", aiProperties.getModel());
+        body.put("model", aiProperties.getGroqModel());
         body.put("temperature", aiProperties.getTemperature());
         body.put("max_completion_tokens", aiProperties.getMaxCompletionTokens());
         body.put("stream", false);
@@ -319,13 +321,11 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
 
         List<Map<String, Object>> messages = new ArrayList<>();
 
-        // System message with strict extraction rules
         Map<String, Object> sysMsg = new HashMap<>();
         sysMsg.put("role", "system");
         sysMsg.put("content", SYSTEM_PROMPT);
         messages.add(sysMsg);
 
-        // User message with image and instruction
         Map<String, Object> userMsg = new HashMap<>();
         userMsg.put("role", "user");
 
@@ -351,10 +351,10 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
     }
 
     AiLabelExtractionResult parseSuccessfulResponse(String responseBody) {
+        String modelName = aiProperties.getGroqModel();
         try {
             JsonNode root = objectMapper.readTree(responseBody);
 
-            // Log token usage safely without exposing secrets
             JsonNode usageNode = root.path("usage");
             if (!usageNode.isMissingNode()) {
                 int promptTokens = usageNode.path("prompt_tokens").asInt(-1);
@@ -371,7 +371,7 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
                 log.warn("Groq Vision AI response had empty choices array");
                 return AiLabelExtractionResult.failed(
                         AiExtractionStatus.AI_FAILED_TESSERACT_FALLBACK,
-                        aiProperties.getModel(),
+                        modelName,
                         "Groq returned empty choices array"
                 );
             }
@@ -381,12 +381,11 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
                 log.warn("Groq Vision AI response message content was empty");
                 return AiLabelExtractionResult.failed(
                         AiExtractionStatus.AI_FAILED_TESSERACT_FALLBACK,
-                        aiProperties.getModel(),
+                        modelName,
                         "Groq returned empty message content"
                 );
             }
 
-            // Strip possible markdown code fences: ```json ... ```
             String cleanJson = content.trim();
             if (cleanJson.startsWith("```json")) {
                 cleanJson = cleanJson.substring(7);
@@ -399,7 +398,6 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
             cleanJson = cleanJson.trim();
 
             JsonNode labelNode = objectMapper.readTree(cleanJson);
-
             StructuredAiLabel structuredLabel = parseStructuredAiLabel(labelNode);
             int detectedCount = structuredLabel.countDetectedFields();
             double confidence = structuredLabel.calculateAverageConfidence();
@@ -408,15 +406,15 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
                     detectedCount, String.format("%.2f", confidence));
 
             if (detectedCount >= 6) {
-                return AiLabelExtractionResult.success(confidence, "Groq Vision", aiProperties.getModel(), structuredLabel);
+                return AiLabelExtractionResult.success(confidence, "Groq Vision", modelName, structuredLabel);
             } else if (detectedCount >= 1) {
-                return AiLabelExtractionResult.partial(confidence, "Groq Vision", aiProperties.getModel(), structuredLabel);
+                return AiLabelExtractionResult.partial(confidence, "Groq Vision", modelName, structuredLabel);
             } else {
                 return new AiLabelExtractionResult(
                         AiExtractionStatus.IMAGE_QUALITY_LOW,
                         0.0,
                         "Groq Vision",
-                        aiProperties.getModel(),
+                        modelName,
                         structuredLabel,
                         cleanJson,
                         "Groq Vision inspected the image but detected 0 legible packaging declarations"
@@ -427,7 +425,7 @@ public class GroqVisionLabelExtractor implements VisionLabelExtractor {
             log.error("Failed to parse Groq Vision JSON response: {}", e.getMessage(), e);
             return AiLabelExtractionResult.failed(
                     AiExtractionStatus.AI_FAILED_TESSERACT_FALLBACK,
-                    aiProperties.getModel(),
+                    modelName,
                     "Failed to deserialize Groq structured response: " + e.getMessage()
             );
         }

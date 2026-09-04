@@ -5,6 +5,7 @@ import {
   Scale, 
   FileText
 } from 'lucide-react';
+import { formatExtractionSource } from '../api/scanMapper';
 
 export default function ReportModal({ product, onClose }) {
   if (!product) return null;
@@ -82,7 +83,7 @@ export default function ReportModal({ product, onClose }) {
             <div>
               <span className="text-slate-400 block font-medium">Extraction Engine</span>
               <strong className="text-slate-800 truncate block" title={product.extractionSource}>
-                {product.extractionSource === 'VISION_AI' ? (product.aiModel ? `Vision AI (${product.aiModel})` : 'Vision AI') : 'Local OCR Fallback'}
+                {formatExtractionSource(product.extractionSource, product.aiModel)}
               </strong>
             </div>
             <div>

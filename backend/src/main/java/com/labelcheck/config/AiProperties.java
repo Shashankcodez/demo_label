@@ -3,10 +3,17 @@ package com.labelcheck.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+
 /**
- * Configuration properties for the Vision AI extraction layer (Groq Vision with qwen/qwen3.6-27b).
- * All properties are fully externalized via environment variables and application.properties.
- * The API key is stored strictly on the server and is never exposed to the frontend.
+ * Configuration properties for the Vision AI extraction layer:
+ * Primary: Google Gemini Vision (gemini-3.6-flash)
+ * Fallback: Groq Vision (qwen/qwen3.6-27b)
+ *
+ * All properties are externalized via environment variables and application.properties.
+ * API keys are stored strictly on the server and are NEVER exposed to the frontend or logged.
  */
 @Configuration
 @ConfigurationProperties(prefix = "app.ai")
@@ -18,26 +25,54 @@ public class AiProperties {
     private boolean enabled = true;
 
     /**
-     * Vision AI provider: "groq", "openai", or "gemini".
+     * Primary Vision AI provider: "gemini" (default) or "groq".
      */
-    private String provider = "groq";
+    private String provider = "gemini";
 
     /**
-     * API key for the Vision AI provider (e.g. GROQ_API_KEY).
-     * Strictly server-side; NEVER sent to the client or logged.
+     * Generic API key fallback.
      */
     private String apiKey = "";
 
     /**
-     * Base URL for the OpenAI-compatible Groq API endpoint.
-     * Default: https://api.groq.com/openai/v1
+     * Gemini-specific API key (read from GEMINI_API_KEY).
      */
-    private String baseUrl = "https://api.groq.com/openai/v1";
+    private String geminiApiKey = "";
 
     /**
-     * Vision multimodal model name (default: qwen/qwen3.6-27b).
+     * Groq-specific API key (read from GROQ_API_KEY).
      */
-    private String model = "qwen/qwen3.6-27b";
+    private String groqApiKey = "";
+
+    /**
+     * Base URL for Google Gemini API endpoint.
+     */
+    private String geminiBaseUrl = "https://generativelanguage.googleapis.com";
+
+    /**
+     * Base URL for Groq OpenAI-compatible endpoint.
+     */
+    private String groqBaseUrl = "https://api.groq.com/openai/v1";
+
+    /**
+     * Generic baseUrl fallback.
+     */
+    private String baseUrl = "";
+
+    /**
+     * Primary Gemini model identifier (default: gemini-3.6-flash).
+     */
+    private String geminiModel = "gemini-3.6-flash";
+
+    /**
+     * Fallback Groq model identifier (default: qwen/qwen3.6-27b).
+     */
+    private String groqModel = "qwen/qwen3.6-27b";
+
+    /**
+     * Explicit model override (null/blank delegates to provider-specific model).
+     */
+    private String model = "";
 
     /**
      * Network connect/read timeout in seconds.
@@ -45,29 +80,29 @@ public class AiProperties {
     private int timeoutSeconds = 30;
 
     /**
-     * Maximum retry attempts for transient HTTP failures (e.g. 429 rate limit or 503).
+     * Maximum retry attempts for transient HTTP failures.
      */
     private int maxRetries = 1;
 
     /**
-     * Maximum completion tokens for vision response (default: 2500).
+     * Maximum completion tokens for vision response.
      */
-    private int maxCompletionTokens = 2500;
+    private int maxCompletionTokens = 4000;
 
     /**
-     * Reasoning effort setting (e.g. "none" for non-thinking mode on Qwen 3.6).
+     * Reasoning effort setting (e.g. "low" for lightweight thinking on Gemini Flash).
      */
-    private String reasoningEffort = "none";
+    private String reasoningEffort = "low";
 
     /**
-     * Sampling temperature (default: 0.2).
+     * Sampling temperature (default: 0.1 for high extraction precision).
      */
-    private double temperature = 0.2;
+    private double temperature = 0.1;
 
     /**
-     * Legacy thinking budget property.
+     * Thinking budget for Gemini models supporting thinkingConfig.
      */
-    private int thinkingBudget = 0;
+    private int thinkingBudget = 1024;
 
     public boolean isEnabled() {
         return enabled;
@@ -82,43 +117,98 @@ public class AiProperties {
     }
 
     public void setProvider(String provider) {
-        this.provider = provider != null ? provider.trim().toLowerCase() : "groq";
+        this.provider = provider != null ? provider.trim().toLowerCase() : "gemini";
+    }
+
+    public String getGeminiApiKey() {
+        if (geminiApiKey != null && !geminiApiKey.isBlank()) {
+            return geminiApiKey.trim();
+        }
+        String envKey = System.getenv("GEMINI_API_KEY");
+        if (envKey != null && !envKey.isBlank()) {
+            return envKey.trim();
+        }
+        String fromDotEnv = loadKeyFromDotEnv("GEMINI_API_KEY");
+        if (fromDotEnv != null && !fromDotEnv.isBlank()) {
+            return fromDotEnv.trim();
+        }
+        if ("gemini".equalsIgnoreCase(provider) && apiKey != null && !apiKey.isBlank()) {
+            return apiKey.trim();
+        }
+        return "";
+    }
+
+    public void setGeminiApiKey(String geminiApiKey) {
+        this.geminiApiKey = geminiApiKey != null ? geminiApiKey.trim() : "";
+    }
+
+    public String getGroqApiKey() {
+        if (groqApiKey != null && !groqApiKey.isBlank()) {
+            return groqApiKey.trim();
+        }
+        String envKey = System.getenv("GROQ_API_KEY");
+        if (envKey != null && !envKey.isBlank()) {
+            return envKey.trim();
+        }
+        String fromDotEnv = loadKeyFromDotEnv("GROQ_API_KEY");
+        if (fromDotEnv != null && !fromDotEnv.isBlank()) {
+            return fromDotEnv.trim();
+        }
+        if ("groq".equalsIgnoreCase(provider) && apiKey != null && !apiKey.isBlank()) {
+            return apiKey.trim();
+        }
+        return "";
+    }
+
+    public void setGroqApiKey(String groqApiKey) {
+        this.groqApiKey = groqApiKey != null ? groqApiKey.trim() : "";
+    }
+
+    public boolean isGeminiConfigured() {
+        return !getGeminiApiKey().isBlank();
+    }
+
+    public boolean isGroqConfigured() {
+        return !getGroqApiKey().isBlank();
     }
 
     public String getApiKey() {
+        if ("groq".equalsIgnoreCase(provider)) {
+            String key = getGroqApiKey();
+            if (!key.isBlank()) return key;
+        } else {
+            String key = getGeminiApiKey();
+            if (!key.isBlank()) return key;
+        }
+
         if (apiKey != null && !apiKey.isBlank()) {
-            return apiKey;
+            return apiKey.trim();
         }
-        String fromEnvFile = loadKeyFromDotEnv();
-        if (fromEnvFile != null && !fromEnvFile.isBlank()) {
-            return fromEnvFile;
-        }
-        return "";
+
+        String gemini = getGeminiApiKey();
+        if (!gemini.isBlank()) return gemini;
+        return getGroqApiKey();
     }
 
     public void setApiKey(String apiKey) {
         this.apiKey = apiKey != null ? apiKey.trim() : "";
     }
 
-    private String loadKeyFromDotEnv() {
-        java.util.List<java.nio.file.Path> candidatePaths = java.util.List.of(
-                java.nio.file.Path.of(".env"),
-                java.nio.file.Path.of("../.env"),
-                java.nio.file.Path.of("backend/.env")
+    private String loadKeyFromDotEnv(String keyName) {
+        List<Path> candidatePaths = List.of(
+                Path.of(".env"),
+                Path.of("../.env"),
+                Path.of("backend/.env")
         );
-        for (java.nio.file.Path p : candidatePaths) {
-            if (java.nio.file.Files.exists(p)) {
+        for (Path p : candidatePaths) {
+            if (Files.exists(p)) {
                 try {
-                    java.util.List<String> lines = java.nio.file.Files.readAllLines(p);
+                    List<String> lines = Files.readAllLines(p);
                     for (String line : lines) {
                         line = line.trim();
                         if (line.startsWith("#") || line.isBlank()) continue;
-                        if (line.startsWith("GROQ_API_KEY=")) {
-                            String val = line.substring("GROQ_API_KEY=".length()).trim();
-                            val = val.replaceAll("^[\"']|[\"']$", "");
-                            if (!val.isBlank()) return val;
-                        } else if (line.startsWith("AI_API_KEY=")) {
-                            String val = line.substring("AI_API_KEY=".length()).trim();
+                        if (line.startsWith(keyName + "=")) {
+                            String val = line.substring((keyName + "=").length()).trim();
                             val = val.replaceAll("^[\"']|[\"']$", "");
                             if (!val.isBlank()) return val;
                         }
@@ -130,20 +220,68 @@ public class AiProperties {
         return null;
     }
 
+    public String getGeminiBaseUrl() {
+        return geminiBaseUrl != null && !geminiBaseUrl.isBlank()
+                ? geminiBaseUrl.trim().replaceAll("/+$", "")
+                : "https://generativelanguage.googleapis.com";
+    }
+
+    public void setGeminiBaseUrl(String geminiBaseUrl) {
+        this.geminiBaseUrl = geminiBaseUrl;
+    }
+
+    public String getGroqBaseUrl() {
+        return groqBaseUrl != null && !groqBaseUrl.isBlank()
+                ? groqBaseUrl.trim().replaceAll("/+$", "")
+                : "https://api.groq.com/openai/v1";
+    }
+
+    public void setGroqBaseUrl(String groqBaseUrl) {
+        this.groqBaseUrl = groqBaseUrl;
+    }
+
     public String getBaseUrl() {
-        return baseUrl;
+        if (baseUrl != null && !baseUrl.isBlank()) {
+            return baseUrl.trim().replaceAll("/+$", "");
+        }
+        if ("groq".equalsIgnoreCase(provider)) {
+            return getGroqBaseUrl();
+        }
+        return getGeminiBaseUrl();
     }
 
     public void setBaseUrl(String baseUrl) {
-        this.baseUrl = baseUrl != null ? baseUrl.trim().replaceAll("/+$", "") : "https://api.groq.com/openai/v1";
+        this.baseUrl = baseUrl != null ? baseUrl.trim().replaceAll("/+$", "") : "";
+    }
+
+    public String getGeminiModel() {
+        return geminiModel != null && !geminiModel.isBlank() ? geminiModel.trim() : "gemini-3.6-flash";
+    }
+
+    public void setGeminiModel(String geminiModel) {
+        this.geminiModel = geminiModel != null ? geminiModel.trim() : "gemini-3.6-flash";
+    }
+
+    public String getGroqModel() {
+        return groqModel != null && !groqModel.isBlank() ? groqModel.trim() : "qwen/qwen3.6-27b";
+    }
+
+    public void setGroqModel(String groqModel) {
+        this.groqModel = groqModel != null ? groqModel.trim() : "qwen/qwen3.6-27b";
     }
 
     public String getModel() {
-        return model;
+        if (model != null && !model.isBlank()) {
+            return model.trim();
+        }
+        if ("groq".equalsIgnoreCase(provider)) {
+            return getGroqModel();
+        }
+        return getGeminiModel();
     }
 
     public void setModel(String model) {
-        this.model = model != null ? model.trim() : "qwen/qwen3.6-27b";
+        this.model = model != null ? model.trim() : "";
     }
 
     public int getTimeoutSeconds() {
@@ -167,7 +305,7 @@ public class AiProperties {
     }
 
     public void setMaxCompletionTokens(int maxCompletionTokens) {
-        this.maxCompletionTokens = maxCompletionTokens > 0 ? maxCompletionTokens : 2500;
+        this.maxCompletionTokens = maxCompletionTokens > 0 ? maxCompletionTokens : 4000;
     }
 
     public String getReasoningEffort() {
@@ -175,7 +313,7 @@ public class AiProperties {
     }
 
     public void setReasoningEffort(String reasoningEffort) {
-        this.reasoningEffort = reasoningEffort != null ? reasoningEffort.trim() : "none";
+        this.reasoningEffort = reasoningEffort != null ? reasoningEffort.trim() : "low";
     }
 
     public double getTemperature() {
@@ -187,11 +325,16 @@ public class AiProperties {
     }
 
     public int getThinkingBudget() {
-        return thinkingBudget;
+        if (thinkingBudget > 0) {
+            return thinkingBudget;
+        }
+        if ("low".equalsIgnoreCase(reasoningEffort)) {
+            return 1024;
+        }
+        return 0;
     }
 
     public void setThinkingBudget(int thinkingBudget) {
         this.thinkingBudget = Math.max(0, thinkingBudget);
     }
 }
-

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Controller exposing the health check endpoint for monitoring service readiness and AI configuration.
+ * Never leaks API keys or secrets.
  */
 @RestController
 @RequestMapping("/api/v1")
@@ -29,10 +30,16 @@ public class HealthController {
      */
     @GetMapping("/health")
     public ResponseEntity<HealthResponse> getHealth() {
-        boolean enabled = aiProperties.isEnabled() && aiProperties.getApiKey() != null && !aiProperties.getApiKey().isBlank();
+        boolean enabled = aiProperties.isEnabled()
+                && (aiProperties.isGeminiConfigured()
+                || aiProperties.isGroqConfigured()
+                || (aiProperties.getApiKey() != null && !aiProperties.getApiKey().isBlank()));
+
+        String provider = enabled
+                ? (aiProperties.getProvider() != null ? aiProperties.getProvider().toLowerCase() : "gemini")
+                : null;
         String model = enabled ? aiProperties.getModel() : null;
-        String provider = enabled ? (aiProperties.getProvider() != null ? aiProperties.getProvider().toLowerCase() : "groq") : null;
+
         return ResponseEntity.ok(new HealthResponse("UP", "LabelCheck Backend", enabled, provider, model));
     }
 }
-

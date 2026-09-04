@@ -79,6 +79,10 @@ export function mapBackendScanToProduct(backendData, imagePreviewUrl = null) {
   let fssaiLicense = ext.fssaiLicenseNumber || 'Not detected';
   if (fssaiStatus === 'APPLIED_FOR') {
     fssaiLicense = 'Applied For';
+  } else if (fssaiStatus === 'TEXT_PRESENT_NUMBER_NEEDS_REVIEW') {
+    fssaiLicense = ext.fssaiLicenseNumber ? `${ext.fssaiLicenseNumber} (Review Needed)` : 'License text present (Review Needed)';
+  } else if (fssaiStatus === 'TEXT_PRESENT_NUMBER_NOT_CONFIRMED') {
+    fssaiLicense = 'FSSAI text/logo visible, number unconfirmed';
   }
   const manufacturer = ext.manufacturerName || 'Not detected';
   const manufacturerAddress = ext.manufacturerAddress || 'Not detected';
@@ -158,7 +162,7 @@ export function mapBackendScanToProduct(backendData, imagePreviewUrl = null) {
     { key: 'countryOfOrigin', name: 'Country of Origin', value: ext.countryOfOrigin || null, detected: isPresent(ext.countryOfOrigin), rule: 'Rule 6(10)', evidence: fieldEvidence.countryOfOrigin || null, confidence: fieldConfidence.countryOfOrigin || null },
     { key: 'mfgDate', name: 'Date of Packing / Mfg (MFD)', value: ext.manufactureOrPackingDate || null, detected: isPresent(ext.manufactureOrPackingDate), rule: 'Rule 6(1)(d)', evidence: fieldEvidence.manufactureOrPackingDate || null, confidence: fieldConfidence.manufactureOrPackingDate || null },
     { key: 'expiryDate', name: 'Best Before / Expiry Date', value: ext.bestBeforeOrExpiry || null, detected: isPresent(ext.bestBeforeOrExpiry), rule: 'Rule 6(1)(d) / FSSAI', evidence: fieldEvidence.bestBeforeOrExpiry || null, confidence: fieldConfidence.bestBeforeOrExpiry || null },
-    { key: 'fssaiLicense', name: 'FSSAI License / Registration', value: fssaiLicense !== 'Not detected' ? fssaiLicense : null, detected: (isPresent(ext.fssaiLicenseNumber) && ext.fssaiLicenseNumber !== 'NOT_DETECTED') || fssaiStatus === 'APPLIED_FOR', rule: 'FSSAI Sec 23', evidence: fieldEvidence.fssaiLicenseNumber || null, confidence: fieldConfidence.fssaiLicenseNumber || null },
+    { key: 'fssaiLicense', name: 'FSSAI License / Registration', value: fssaiLicense !== 'Not detected' ? fssaiLicense : null, detected: (isPresent(ext.fssaiLicenseNumber) && ext.fssaiLicenseNumber !== 'NOT_DETECTED') || fssaiStatus === 'APPLIED_FOR' || (typeof fssaiStatus === 'string' && fssaiStatus.startsWith('TEXT_PRESENT')), rule: 'FSSAI Sec 23', evidence: fieldEvidence.fssaiLicenseNumber || null, confidence: fieldConfidence.fssaiLicenseNumber || null },
     { key: 'customerCare', name: 'Consumer Care Contact', value: customerCare.phone || customerCare.email || customerCare.address || null, detected: isPresent(customerCare.phone) || isPresent(customerCare.email) || isPresent(customerCare.address), rule: 'Rule 6(1)(n)', evidence: fieldEvidence.customerCarePhone || fieldEvidence.customerCareEmail || null, confidence: fieldConfidence.customerCarePhone || fieldConfidence.customerCareEmail || null }
   ];
 
@@ -357,12 +361,15 @@ export function formatExtractionStatus(status) {
  * Formats extraction source into user-friendly badge text.
  */
 export function formatExtractionSource(source, model) {
-  if (!source) return 'Groq Vision';
+  if (!source) return model ? `Vision AI (${model})` : 'Gemini Vision';
+  if (source === 'Gemini Vision' || source === 'Vision AI (Gemini)') {
+    return model ? `Gemini Vision (${model})` : 'Gemini Vision';
+  }
   if (source === 'Groq Vision' || source === 'Vision AI (Groq)') {
     return model ? `Groq Vision (${model})` : 'Groq Vision';
   }
   if (source === 'VISION_AI') {
-    return model ? `Groq Vision (${model})` : 'Groq Vision Extraction';
+    return model ? `Vision AI (${model})` : 'Vision AI Extraction';
   }
   if (source === 'TESSERACT_FALLBACK') {
     return 'Local OCR Engine (Fallback)';

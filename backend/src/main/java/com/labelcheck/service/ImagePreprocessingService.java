@@ -12,12 +12,16 @@ import java.awt.image.ConvolveOp;
 import java.awt.image.DataBufferByte;
 import java.awt.image.Kernel;
 import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Preprocesses product label images for optimal Tesseract OCR text extraction.
@@ -392,6 +396,117 @@ public class ImagePreprocessingService {
             log.warn("Image quality check failed gracefully: {}", e.getMessage());
             return new QualityAssessment(false, "Quality check skipped", 0, 0);
         }
+    }
+
+    public record LabelPanelCrop(
+            String panelName,
+            String description,
+            byte[] imageBytes,
+            String mimeType
+    ) {}
+
+    /**
+     * Generates high-resolution adaptive panel crops for multi-panel product labels (e.g. wide pouches, wraps, cartons).
+     * For wide images (aspect ratio >= 1.35), creates 3 overlapping vertical slices (LEFT, CENTER, RIGHT).
+     * Adds an intentional ~15% overlap between regions so text across panel boundaries is never lost.
+     * Preserves native resolution without aggressive downsampling or character-distorting filters.
+     */
+    public List<LabelPanelCrop> createAdaptivePanelCrops(Path imagePath) {
+        if (imagePath == null || !Files.exists(imagePath)) {
+            return Collections.emptyList();
+        }
+
+        try {
+            BufferedImage original = ImageIO.read(imagePath.toFile());
+            if (original == null) {
+                return Collections.emptyList();
+            }
+
+            // Correct EXIF orientation if needed
+            int orientation = readExifOrientation(imagePath);
+            BufferedImage oriented = correctOrientation(original, orientation);
+
+            int w = oriented.getWidth();
+            int h = oriented.getHeight();
+            if (w <= 0 || h <= 0) {
+                return Collections.emptyList();
+            }
+
+            double aspectRatio = (double) w / h;
+            List<LabelPanelCrop> crops = new ArrayList<>();
+
+            // Adaptive panel segmentation for wide labels (e.g. pouches, wrap-arounds, cartons)
+            if (aspectRatio >= 1.35) {
+                log.info("Image aspect ratio is wide ({}, {}x{}). Generating 3 overlapping panel crops.",
+                        String.format("%.2f", aspectRatio), w, h);
+
+                // Panel 1: LEFT (0% to 42% of width) - Nutrition, manufacturer/packer, consumer care, barcode
+                int leftW = Math.min(w, (int) Math.round(w * 0.42));
+                BufferedImage leftImg = oriented.getSubimage(0, 0, leftW, h);
+                crops.add(new LabelPanelCrop(
+                        "LEFT PANEL (HIGH RESOLUTION)",
+                        "High-resolution crop of the left panel containing nutrition table, manufacturer/packer statements, consumer care contacts, and certifications.",
+                        bufferedImageToBytes(leftImg, "PNG"),
+                        "image/png"
+                ));
+
+                // Panel 2: CENTER (28% to 72% of width) - Brand, product name, front-of-pack graphics
+                int centerX = (int) Math.round(w * 0.28);
+                int centerW = Math.min(w - centerX, (int) Math.round(w * 0.44));
+                BufferedImage centerImg = oriented.getSubimage(centerX, 0, centerW, h);
+                crops.add(new LabelPanelCrop(
+                        "CENTER / FRONT PANEL (HIGH RESOLUTION)",
+                        "High-resolution crop of the center front-panel containing brand name, prominent product title (e.g. REFINED SUNFLOWER OIL), and primary marketing declarations.",
+                        bufferedImageToBytes(centerImg, "PNG"),
+                        "image/png"
+                ));
+
+                // Panel 3: RIGHT (58% to 100% of width) - MRP, batch, quantity, packed on, best before, ingredients, FSSAI
+                int rightX = (int) Math.round(w * 0.58);
+                int rightW = w - rightX;
+                BufferedImage rightImg = oriented.getSubimage(rightX, 0, rightW, h);
+                crops.add(new LabelPanelCrop(
+                        "RIGHT PANEL (HIGH RESOLUTION)",
+                        "High-resolution crop of the right panel containing Net Quantity, MRP, Batch Number, Packed On date, Best Before statement, Ingredients list, and FSSAI logo / License number.",
+                        bufferedImageToBytes(rightImg, "PNG"),
+                        "image/png"
+                ));
+            } else if (aspectRatio <= 0.65) {
+                // Tall label: Top and Bottom panels
+                log.info("Image aspect ratio is tall ({}, {}x{}). Generating 2 overlapping vertical panel crops.",
+                        String.format("%.2f", aspectRatio), w, h);
+
+                int topH = Math.min(h, (int) Math.round(h * 0.58));
+                BufferedImage topImg = oriented.getSubimage(0, 0, w, topH);
+                crops.add(new LabelPanelCrop(
+                        "TOP / FRONT PANEL (HIGH RESOLUTION)",
+                        "High-resolution crop of the upper panel containing product name, brand branding, and front declarations.",
+                        bufferedImageToBytes(topImg, "PNG"),
+                        "image/png"
+                ));
+
+                int botY = (int) Math.round(h * 0.42);
+                int botH = h - botY;
+                BufferedImage botImg = oriented.getSubimage(0, botY, w, botH);
+                crops.add(new LabelPanelCrop(
+                        "BOTTOM / STATUTORY PANEL (HIGH RESOLUTION)",
+                        "High-resolution crop of the lower panel containing statutory declarations, dates, MRP, batch, and FSSAI.",
+                        bufferedImageToBytes(botImg, "PNG"),
+                        "image/png"
+                ));
+            }
+
+            return crops;
+        } catch (Exception e) {
+            log.warn("Failed to generate adaptive panel crops from [{}]: {}", imagePath, e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    private byte[] bufferedImageToBytes(BufferedImage img, String format) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIO.write(img, format, baos);
+        return baos.toByteArray();
     }
 }
 
