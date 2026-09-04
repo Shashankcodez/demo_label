@@ -330,7 +330,7 @@ export default function ScannerPage({
           <div>
             <p className="text-sm font-bold text-slate-800">AI Vision Analysis</p>
             <p className="text-xs text-slate-500 font-medium">
-              Gemini Vision analyzes the uploaded label image and extracts the required declarations for compliance checking.
+              AI-supported solution analyzes the uploaded label image and extracts the required declarations for compliance checking.
             </p>
           </div>
         </div>
