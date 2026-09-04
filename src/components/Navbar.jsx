@@ -7,11 +7,10 @@ import {
   Home, 
   Menu, 
   X, 
-  Sparkles,
-  Smartphone
+  Sparkles
 } from 'lucide-react';
 
-export default function Navbar({ activePage, setActivePage, activeProduct, onQuickDemo, onOpenMobileQr }) {
+export default function Navbar({ activePage, setActivePage, activeProduct, onQuickDemo }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleNav = (page) => {
@@ -117,16 +116,6 @@ export default function Navbar({ activePage, setActivePage, activeProduct, onQui
             {/* Quick Action Button */}
             <div className="hidden sm:flex items-center gap-2">
               <button
-                id="nav-mobile-qr"
-                onClick={onOpenMobileQr}
-                className="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
-                title="Scan QR code to open on phone"
-              >
-                <Smartphone className="w-4 h-4 text-gov-blue" />
-                <span className="hidden lg:inline">Open on</span> Phone
-              </button>
-
-              <button
                 id="nav-quick-demo"
                 onClick={onQuickDemo}
                 className="px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
@@ -219,17 +208,6 @@ export default function Navbar({ activePage, setActivePage, activeProduct, onQui
             >
               <History className="w-4 h-4 text-gov-blue" />
               Scan History
-            </button>
-
-            <button
-              onClick={() => {
-                onOpenMobileQr();
-                setMobileMenuOpen(false);
-              }}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              <Smartphone className="w-4 h-4 text-gov-blue" />
-              Connect Another Phone (QR Code)
             </button>
 
             <div className="pt-2 border-t border-slate-100 flex gap-2">

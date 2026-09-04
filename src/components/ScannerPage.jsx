@@ -9,23 +9,8 @@ import {
   ArrowRight, 
   Scan,
   X,
-  Globe
+  Cpu
 } from 'lucide-react';
-import { getOcrLanguages } from '../api/labelCheckApi';
-
-const INDIAN_LANGUAGE_CATALOG = [
-  { code: 'eng', name: 'English', value: 'eng' },
-  { code: 'hin', name: 'English + Hindi', value: 'eng+hin' },
-  { code: 'tam', name: 'English + Tamil', value: 'eng+tam' },
-  { code: 'tel', name: 'English + Telugu', value: 'eng+tel' },
-  { code: 'kan', name: 'English + Kannada', value: 'eng+kan' },
-  { code: 'mal', name: 'English + Malayalam', value: 'eng+mal' },
-  { code: 'mar', name: 'English + Marathi', value: 'eng+mar' },
-  { code: 'ben', name: 'English + Bengali', value: 'eng+ben' },
-  { code: 'guj', name: 'English + Gujarati', value: 'eng+guj' },
-  { code: 'pan', name: 'English + Punjabi', value: 'eng+pan' },
-  { code: 'ori', name: 'English + Odia', value: 'eng+ori' },
-];
 
 const scanDebug = (...args) => {
 
@@ -78,59 +63,9 @@ export default function ScannerPage({
   const [activeDemoPreset, setActiveDemoPreset] = useState(null);
   const [dragActive, setDragActive] = useState(false);
 
-  const [selectedLanguage, setSelectedLanguage] = useState(() => {
-    try {
-      return localStorage.getItem('labelcheck_ocr_language') || 'eng';
-    } catch {
-      return 'eng';
-    }
-  });
-  const [availableLanguageCodes, setAvailableLanguageCodes] = useState(['eng']);
-  const [isLanguagesLoading, setIsLanguagesLoading] = useState(true);
-
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const previewUrlRef = useRef(null);
-
-  useEffect(() => {
-    let isMounted = true;
-    async function loadLanguages() {
-      try {
-        const codes = await getOcrLanguages();
-        if (isMounted && Array.isArray(codes) && codes.length > 0) {
-          setAvailableLanguageCodes(codes);
-          scanDebug('Loaded available OCR languages:', codes);
-        }
-      } catch (e) {
-        scanDebug('Failed to load OCR languages, using default English:', e?.message);
-      } finally {
-        if (isMounted) setIsLanguagesLoading(false);
-      }
-    }
-    loadLanguages();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const languageOptions = React.useMemo(() => {
-    return INDIAN_LANGUAGE_CATALOG.filter(lang => {
-      if (lang.code === 'eng') return true;
-      return availableLanguageCodes.includes(lang.code);
-    });
-  }, [availableLanguageCodes]);
-
-  const handleLanguageChange = (e) => {
-    const val = e.target.value;
-    setSelectedLanguage(val);
-    try {
-      localStorage.setItem('labelcheck_ocr_language', val);
-    } catch {
-      // ignore
-    }
-    scanDebug('User selected OCR language:', val);
-  };
-
 
   useEffect(() => {
     scanDebug('ScannerPage MOUNTED', { scannerKey });
@@ -258,6 +193,7 @@ export default function ScannerPage({
   };
 
   // Trigger analysis
+  // Language is always 'eng' — OCR is disabled in production; Gemini Vision handles extraction.
   const handleStartAnalysis = () => {
     scanDebug('Analyze button clicked', {
       isAnalyzing,
@@ -284,8 +220,10 @@ export default function ScannerPage({
       scanDebug('Analyzing demo preset', { id: activeDemoPreset.id, name: activeDemoPreset.name });
       onAnalyze(activeDemoPreset);
     } else if (selectedFile) {
-      scanDebug('Analyzing real image file', { name: selectedFile.name, size: selectedFile.size, language: selectedLanguage });
-      onAnalyze(null, selectedImage, selectedImageName, selectedFile, selectedLanguage);
+      scanDebug('Analyzing real image file', { name: selectedFile.name, size: selectedFile.size });
+      // Pass 'eng' as language — backend API expects the param but OCR is disabled (APP_OCR_ENABLED=false).
+      // Gemini Vision performs the actual label extraction regardless of this value.
+      onAnalyze(null, selectedImage, selectedImageName, selectedFile, 'eng');
     } else {
 
       scanDebug('ERROR: selectedImage present but selectedFile is null!');
@@ -337,7 +275,7 @@ export default function ScannerPage({
           <div className="mt-3.5 pt-3 border-t border-rose-200/80 grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs sm:text-sm text-rose-950 font-medium">
             <div className="flex items-center gap-2">
               <span className="text-base">📸</span>
-              <span>Hold camera steady & tap text to focus</span>
+              <span>Hold camera steady &amp; tap text to focus</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-base">💡</span>
@@ -384,39 +322,16 @@ export default function ScannerPage({
           onChange={handleFileChange}
         />
 
-        {/* OCR Language Selector */}
-        <div className="mb-4 bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-100/70 text-gov-blue flex items-center justify-center shrink-0 border border-blue-200">
-              <Globe className="w-4 h-4" />
-            </div>
-            <div>
-              <label htmlFor="ocr-language" className="text-sm font-bold text-slate-800 block cursor-pointer">
-                OCR Language
-              </label>
-              <p className="text-xs text-slate-500 font-medium">
-                Default: English. Choose bilingual mode for Indian packaging scripts.
-              </p>
-            </div>
+        {/* AI Vision Analysis Info Banner */}
+        <div className="mb-4 bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-3.5 flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-blue-100/70 text-gov-blue flex items-center justify-center shrink-0 border border-blue-200">
+            <Cpu className="w-4 h-4" />
           </div>
-
-          <div className="flex items-center gap-2">
-            {isLanguagesLoading ? (
-              <span className="text-[11px] text-slate-400 italic px-1">Checking models...</span>
-            ) : null}
-            <select
-              id="ocr-language"
-              name="ocrLanguage"
-              value={selectedLanguage}
-              onChange={handleLanguageChange}
-              className="w-full sm:w-auto px-3.5 py-2 text-xs sm:text-sm font-semibold bg-white border border-slate-300 rounded-xl text-slate-800 shadow-sm hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-gov-blue cursor-pointer"
-            >
-              {languageOptions.map(opt => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.name}
-                </option>
-              ))}
-            </select>
+          <div>
+            <p className="text-sm font-bold text-slate-800">AI Vision Analysis</p>
+            <p className="text-xs text-slate-500 font-medium">
+              Gemini Vision analyzes the uploaded label image and extracts the required declarations for compliance checking.
+            </p>
           </div>
         </div>
 
@@ -470,7 +385,7 @@ export default function ScannerPage({
             </div>
 
             <p className="text-xs text-slate-500 mt-5 font-medium">
-              Supports JPEG, PNG, WEBP • Ensures optimal OCR when label text is sharp & glare-free
+              Supports JPEG, PNG, WEBP • Ensure label text is sharp &amp; glare-free for best results
             </p>
           </div>
         ) : (
@@ -513,7 +428,7 @@ export default function ScannerPage({
                 
                 {/* Live Detection Indicators */}
                 <div className="absolute bottom-3 left-4 text-[10px] font-mono text-cyan-300/80 tracking-wider">
-                  OCR_STATUS: READY • REGION_LOCKED
+                  AI_VISION: READY • REGION_LOCKED
                 </div>
               </div>
 
@@ -592,7 +507,7 @@ export default function ScannerPage({
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-500" />
             <h3 className="text-sm sm:text-base font-bold text-slate-800 uppercase tracking-wider">
-              Test Quality Tiers & Field Yields (Instant Load)
+              Test Quality Tiers &amp; Field Yields (Instant Load)
             </h3>
           </div>
           <span className="text-xs sm:text-sm text-slate-600 font-medium">
@@ -708,7 +623,7 @@ export default function ScannerPage({
                 ) : (
                   <div className="w-4 h-4 rounded-full border-2 border-slate-200 shrink-0"></div>
                 )}
-                <span>2. Local Tesseract OCR text extraction</span>
+                <span>2. AI Vision Analysis — extracting declarations</span>
               </div>
 
               <div className={`flex items-center gap-2.5 transition-colors ${
@@ -722,7 +637,7 @@ export default function ScannerPage({
                 ) : (
                   <div className="w-4 h-4 rounded-full border-2 border-slate-200 shrink-0"></div>
                 )}
-                <span>3. Parsing statutory entities & rule evaluation</span>
+                <span>3. Parsing statutory entities &amp; rule evaluation</span>
               </div>
 
               <div className={`flex items-center gap-2.5 transition-colors ${
@@ -736,7 +651,7 @@ export default function ScannerPage({
                 ) : (
                   <div className="w-4 h-4 rounded-full border-2 border-slate-200 shrink-0"></div>
                 )}
-                <span>4. Saving analysis & generating report</span>
+                <span>4. Saving analysis &amp; generating report</span>
               </div>
             </div>
 

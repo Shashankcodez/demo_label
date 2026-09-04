@@ -5,7 +5,6 @@ import ScannerPage from './components/ScannerPage';
 import ResultPage from './components/ResultPage';
 import HistoryPage from './components/HistoryPage';
 import ReportModal from './components/ReportModal';
-import MobileQrModal from './components/MobileQrModal';
 import { SAMPLE_PRODUCTS, DEFAULT_HISTORY } from './data/mockProducts';
 import { scanLabel, getScanById } from './api/labelCheckApi';
 import { mapBackendScanToProduct, dataUrlToFile } from './api/scanMapper';
@@ -39,7 +38,6 @@ export default function App() {
   });
   const [activeProduct, setActiveProduct] = useState(SAMPLE_PRODUCTS[0]);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -378,7 +376,6 @@ export default function App() {
         setActivePage={handleNavPage}
         activeProduct={activeProduct}
         onQuickDemo={handleQuickDemo}
-        onOpenMobileQr={() => setIsQrModalOpen(true)}
       />
 
       {/* Main Page Routing */}
@@ -430,14 +427,6 @@ export default function App() {
         <ReportModal
           product={activeProduct}
           onClose={() => setIsReportModalOpen(false)}
-        />
-      )}
-
-      {/* Mobile QR Modal */}
-      {isQrModalOpen && (
-        <MobileQrModal
-          isOpen={isQrModalOpen}
-          onClose={() => setIsQrModalOpen(false)}
         />
       )}
 
