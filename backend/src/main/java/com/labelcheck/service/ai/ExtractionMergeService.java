@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -65,8 +66,22 @@ public class ExtractionMergeService {
             Double overallConfidence,
             Map<String, String> fieldEvidence,
             Map<String, Double> fieldConfidence,
-            String summaryMessage
-    ) {}
+            String summaryMessage,
+            String fullTranscribedText,
+            Map<String, List<Integer>> fieldBoundingBoxes
+    ) {
+        public MergedResult(
+                StructuredLabelData labelData,
+                String extractionSource,
+                String extractionStatus,
+                Double overallConfidence,
+                Map<String, String> fieldEvidence,
+                Map<String, Double> fieldConfidence,
+                String summaryMessage
+        ) {
+            this(labelData, extractionSource, extractionStatus, overallConfidence, fieldEvidence, fieldConfidence, summaryMessage, null, Map.of());
+        }
+    }
 
     public MergedResult merge(
             AiLabelExtractionResult aiResult,
@@ -76,6 +91,7 @@ public class ExtractionMergeService {
     ) {
         Map<String, String> evidenceMap = new HashMap<>();
         Map<String, Double> confidenceMap = new HashMap<>();
+        Map<String, List<Integer>> boundingBoxMap = new HashMap<>();
 
         boolean aiAvailable = aiResult != null
                 && (aiResult.status() == AiExtractionStatus.AI_SUCCESS || aiResult.status() == AiExtractionStatus.AI_PARTIAL)
@@ -114,6 +130,25 @@ public class ExtractionMergeService {
             String careAddress = ocrData != null ? ocrData.customerCareAddress() : null;
             String batchNumber = resolveGenericField(ai.batchNumber(), ocrData != null ? ocrData.batchNumber() : null, "batchNumber", evidenceMap, confidenceMap);
 
+            // Collect spatial 2D bounding boxes for inspector
+            addFieldBoundingBox(boundingBoxMap, "productName", ai.productName());
+            addFieldBoundingBox(boundingBoxMap, "brand", ai.brand());
+            addFieldBoundingBox(boundingBoxMap, "netQuantity", ai.netQuantity());
+            addFieldBoundingBox(boundingBoxMap, "mrp", ai.mrp());
+            addFieldBoundingBox(boundingBoxMap, "unitSalePrice", ai.unitSalePrice());
+            addFieldBoundingBox(boundingBoxMap, "batchNumber", ai.batchNumber());
+            addFieldBoundingBox(boundingBoxMap, "mfgDate", ai.manufacturedOrPackedDate());
+            addFieldBoundingBox(boundingBoxMap, "expiryDate", ai.bestBeforeOrExpiry());
+            addFieldBoundingBox(boundingBoxMap, "fssaiLicense", ai.fssaiLicenseNumber());
+            addFieldBoundingBox(boundingBoxMap, "manufacturer", ai.manufacturer() != null && ai.manufacturer().hasBoundingBox() ? ai.manufacturer() : ai.packer());
+            addFieldBoundingBox(boundingBoxMap, "address", ai.address());
+            addFieldBoundingBox(boundingBoxMap, "countryOfOrigin", ai.countryOfOrigin());
+            addFieldBoundingBox(boundingBoxMap, "customerCare", ai.phone() != null && ai.phone().hasBoundingBox() ? ai.phone() : (ai.email() != null && ai.email().hasBoundingBox() ? ai.email() : ai.consumerCare()));
+
+            String effectiveRawText = (ai.fullTranscribedText() != null && !ai.fullTranscribedText().isBlank())
+                    ? ai.fullTranscribedText()
+                    : rawOcrText;
+
             StructuredLabelData mergedData = new StructuredLabelData(
                     productName,
                     brand,
@@ -132,7 +167,7 @@ public class ExtractionMergeService {
                     phone,
                     email,
                     careAddress,
-                    rawOcrText,
+                    effectiveRawText,
                     batchNumber,
                     fssaiStatus
             );
@@ -157,7 +192,9 @@ public class ExtractionMergeService {
                     overallConf,
                     evidenceMap,
                     confidenceMap,
-                    summary
+                    summary,
+                    effectiveRawText,
+                    boundingBoxMap
             );
         }
 
@@ -190,8 +227,16 @@ public class ExtractionMergeService {
                 fallbackConf,
                 evidenceMap,
                 confidenceMap,
-                summary
+                summary,
+                rawOcrText,
+                Map.of()
         );
+    }
+
+    private void addFieldBoundingBox(Map<String, List<Integer>> map, String key, FieldExtraction field) {
+        if (field != null && field.hasBoundingBox()) {
+            map.put(key, field.boundingBox());
+        }
     }
 
     public static boolean isHeadingFragment(String val) {

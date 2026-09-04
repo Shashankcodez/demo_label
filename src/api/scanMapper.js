@@ -55,7 +55,13 @@ export function mapBackendScanToProduct(backendData, imagePreviewUrl = null) {
     detected: c.detected || 'Not detected on package label',
     legalReason: c.legalReason || 'Statutory compliance verification',
     recommendation: c.recommendation || 'Verify packaging declarations against statutory standards.',
-    severity: c.severity ? c.severity.toLowerCase() : (c.status === 'VIOLATION' ? 'violation' : c.status === 'WARNING' ? 'warning' : 'none')
+    severity: c.severity ? c.severity.toLowerCase() : (c.status === 'VIOLATION' || c.status === 'FAIL' ? 'violation' : c.status === 'WARNING' ? 'warning' : 'none'),
+    regulationFamily: c.regulationFamily || 'LEGAL_METROLOGY',
+    extractedValue: c.extractedValue || null,
+    evidenceText: c.evidenceText || null,
+    evidenceSource: c.evidenceSource || null,
+    manualReviewReason: c.manualReviewReason || null,
+    validationConfidence: typeof c.validationConfidence === 'number' ? c.validationConfidence : null
   }));
 
   // Do NOT invent missing values! Use 'Not detected' for absent statutory elements
@@ -147,24 +153,40 @@ export function mapBackendScanToProduct(backendData, imagePreviewUrl = null) {
   const aiModel = backendData.aiModel || (aiEnabled ? 'qwen/qwen3.6-27b' : null);
   const fieldEvidence = backendData.fieldEvidence || {};
   const fieldConfidence = backendData.fieldConfidence || {};
+  const fieldBoundingBoxes = backendData.fieldBoundingBoxes || {};
 
   // 12 Statutory Declarations Detection Check under Rule 6 & FSSAI
   const isPresent = (val) => Boolean(val && val !== 'Not detected' && val !== 'null' && String(val).trim().length > 0);
 
   const statutoryFields = [
-    { key: 'productName', name: 'Product Name / Identity', value: ext.productName || null, detected: isPresent(ext.productName), rule: 'Rule 6(1)(l)', evidence: fieldEvidence.productName || null, confidence: fieldConfidence.productName || null },
-    { key: 'brand', name: 'Brand Name', value: ext.brand || null, detected: isPresent(ext.brand), rule: 'Rule 6(1)(l)', evidence: fieldEvidence.brand || null, confidence: fieldConfidence.brand || null },
-    { key: 'netQuantity', name: 'Net Quantity', value: ext.netQuantity || null, detected: isPresent(ext.netQuantity), rule: 'Rule 6(1)(c)', evidence: fieldEvidence.netQuantity || null, confidence: fieldConfidence.netQuantity || null },
-    { key: 'mrp', name: 'Maximum Retail Price (MRP)', value: ext.mrp || null, detected: isPresent(ext.mrp), rule: 'Rule 6(1)(e)', evidence: fieldEvidence.mrp || null, confidence: fieldConfidence.mrp || null },
-    { key: 'unitSalePrice', name: 'Unit Sale Price (USP)', value: ext.unitSalePrice || null, detected: isPresent(ext.unitSalePrice), rule: 'Rule 6(1)(e) Amend.', evidence: fieldEvidence.unitSalePrice || null, confidence: fieldConfidence.unitSalePrice || null },
-    { key: 'manufacturer', name: 'Manufacturer / Packer Name', value: ext.manufacturerName || ext.importerName || null, detected: isPresent(ext.manufacturerName || ext.importerName), rule: 'Rule 6(1)(a)', evidence: fieldEvidence.manufacturerName || null, confidence: fieldConfidence.manufacturerName || null },
-    { key: 'address', name: 'Manufacturer / Packer Address', value: ext.manufacturerAddress || ext.importerAddress || null, detected: isPresent(ext.manufacturerAddress || ext.importerAddress), rule: 'Rule 6(1)(a)', evidence: fieldEvidence.manufacturerAddress || null, confidence: fieldConfidence.manufacturerAddress || null },
-    { key: 'countryOfOrigin', name: 'Country of Origin', value: ext.countryOfOrigin || null, detected: isPresent(ext.countryOfOrigin), rule: 'Rule 6(10)', evidence: fieldEvidence.countryOfOrigin || null, confidence: fieldConfidence.countryOfOrigin || null },
-    { key: 'mfgDate', name: 'Date of Packing / Mfg (MFD)', value: ext.manufactureOrPackingDate || null, detected: isPresent(ext.manufactureOrPackingDate), rule: 'Rule 6(1)(d)', evidence: fieldEvidence.manufactureOrPackingDate || null, confidence: fieldConfidence.manufactureOrPackingDate || null },
-    { key: 'expiryDate', name: 'Best Before / Expiry Date', value: ext.bestBeforeOrExpiry || null, detected: isPresent(ext.bestBeforeOrExpiry), rule: 'Rule 6(1)(d) / FSSAI', evidence: fieldEvidence.bestBeforeOrExpiry || null, confidence: fieldConfidence.bestBeforeOrExpiry || null },
-    { key: 'fssaiLicense', name: 'FSSAI License / Registration', value: fssaiLicense !== 'Not detected' ? fssaiLicense : null, detected: (isPresent(ext.fssaiLicenseNumber) && ext.fssaiLicenseNumber !== 'NOT_DETECTED') || fssaiStatus === 'APPLIED_FOR' || (typeof fssaiStatus === 'string' && fssaiStatus.startsWith('TEXT_PRESENT')), rule: 'FSSAI Sec 23', evidence: fieldEvidence.fssaiLicenseNumber || null, confidence: fieldConfidence.fssaiLicenseNumber || null },
-    { key: 'customerCare', name: 'Consumer Care Contact', value: customerCare.phone || customerCare.email || customerCare.address || null, detected: isPresent(customerCare.phone) || isPresent(customerCare.email) || isPresent(customerCare.address), rule: 'Rule 6(1)(n)', evidence: fieldEvidence.customerCarePhone || fieldEvidence.customerCareEmail || null, confidence: fieldConfidence.customerCarePhone || fieldConfidence.customerCareEmail || null }
+    { key: 'productName', name: 'Product Name / Identity', value: ext.productName || null, detected: isPresent(ext.productName), rule: 'Rule 6(1)(l)', evidence: fieldEvidence.productName || null, confidence: fieldConfidence.productName || null, boundingBox: fieldBoundingBoxes.productName || null },
+    { key: 'brand', name: 'Brand Name', value: ext.brand || null, detected: isPresent(ext.brand), rule: 'Rule 6(1)(l)', evidence: fieldEvidence.brand || null, confidence: fieldConfidence.brand || null, boundingBox: fieldBoundingBoxes.brand || null },
+    { key: 'netQuantity', name: 'Net Quantity', value: ext.netQuantity || null, detected: isPresent(ext.netQuantity), rule: 'Rule 6(1)(c)', evidence: fieldEvidence.netQuantity || null, confidence: fieldConfidence.netQuantity || null, boundingBox: fieldBoundingBoxes.netQuantity || null },
+    { key: 'mrp', name: 'Maximum Retail Price (MRP)', value: ext.mrp || null, detected: isPresent(ext.mrp), rule: 'Rule 6(1)(e)', evidence: fieldEvidence.mrp || null, confidence: fieldConfidence.mrp || null, boundingBox: fieldBoundingBoxes.mrp || null },
+    { key: 'unitSalePrice', name: 'Unit Sale Price (USP)', value: ext.unitSalePrice || null, detected: isPresent(ext.unitSalePrice), rule: 'Rule 6(1)(e) Amend.', evidence: fieldEvidence.unitSalePrice || null, confidence: fieldConfidence.unitSalePrice || null, boundingBox: fieldBoundingBoxes.unitSalePrice || null },
+    { key: 'manufacturer', name: 'Manufacturer / Packer Name', value: ext.manufacturerName || ext.importerName || null, detected: isPresent(ext.manufacturerName || ext.importerName), rule: 'Rule 6(1)(a)', evidence: fieldEvidence.manufacturerName || null, confidence: fieldConfidence.manufacturerName || null, boundingBox: fieldBoundingBoxes.manufacturer || null },
+    { key: 'address', name: 'Manufacturer / Packer Address', value: ext.manufacturerAddress || ext.importerAddress || null, detected: isPresent(ext.manufacturerAddress || ext.importerAddress), rule: 'Rule 6(1)(a)', evidence: fieldEvidence.manufacturerAddress || null, confidence: fieldConfidence.manufacturerAddress || null, boundingBox: fieldBoundingBoxes.address || null },
+    { key: 'countryOfOrigin', name: 'Country of Origin', value: ext.countryOfOrigin || null, detected: isPresent(ext.countryOfOrigin), rule: 'Rule 6(10)', evidence: fieldEvidence.countryOfOrigin || null, confidence: fieldConfidence.countryOfOrigin || null, boundingBox: fieldBoundingBoxes.countryOfOrigin || null },
+    { key: 'mfgDate', name: 'Date of Packing / Mfg (MFD)', value: ext.manufactureOrPackingDate || null, detected: isPresent(ext.manufactureOrPackingDate), rule: 'Rule 6(1)(d)', evidence: fieldEvidence.manufactureOrPackingDate || null, confidence: fieldConfidence.manufactureOrPackingDate || null, boundingBox: fieldBoundingBoxes.mfgDate || null },
+    { key: 'expiryDate', name: 'Best Before / Expiry Date', value: ext.bestBeforeOrExpiry || null, detected: isPresent(ext.bestBeforeOrExpiry), rule: 'Rule 6(1)(d) / FSSAI', evidence: fieldEvidence.bestBeforeOrExpiry || null, confidence: fieldConfidence.bestBeforeOrExpiry || null, boundingBox: fieldBoundingBoxes.expiryDate || null },
+    { key: 'fssaiLicense', name: 'FSSAI License / Registration', value: fssaiLicense !== 'Not detected' ? fssaiLicense : null, detected: (isPresent(ext.fssaiLicenseNumber) && ext.fssaiLicenseNumber !== 'NOT_DETECTED') || fssaiStatus === 'APPLIED_FOR' || (typeof fssaiStatus === 'string' && fssaiStatus.startsWith('TEXT_PRESENT')), rule: 'FSSAI Sec 23', evidence: fieldEvidence.fssaiLicenseNumber || null, confidence: fieldConfidence.fssaiLicenseNumber || null, boundingBox: fieldBoundingBoxes.fssaiLicense || null },
+    { key: 'customerCare', name: 'Consumer Care Contact', value: customerCare.phone || customerCare.email || customerCare.address || null, detected: isPresent(customerCare.phone) || isPresent(customerCare.email) || isPresent(customerCare.address), rule: 'Rule 6(1)(n)', evidence: fieldEvidence.customerCarePhone || fieldEvidence.customerCareEmail || null, confidence: fieldConfidence.customerCarePhone || fieldConfidence.customerCareEmail || null, boundingBox: fieldBoundingBoxes.customerCare || null }
   ];
+
+  // Dynamic evidence list from actual detected declarations
+  const dynamicEvidenceList = statutoryFields
+    .filter(f => f.detected && (f.evidence || f.value))
+    .map((f) => ({
+      id: `ev-${f.key}`,
+      key: f.key,
+      title: `${f.name}`,
+      caption: f.evidence || f.value,
+      value: f.value,
+      rule: f.rule,
+      confidence: f.confidence,
+      boundingBox: f.boundingBox,
+      imageUrl: imagePreviewUrl || (productName.toLowerCase().includes('sunflower') ? '/sample_sunflower_oil.png' : null)
+    }));
 
   const calculatedFieldCount = statutoryFields.filter(f => f.detected).length;
   const detectedFieldsCount = typeof backendData.detectedFieldsCount === 'number' 
@@ -254,7 +276,18 @@ export function mapBackendScanToProduct(backendData, imagePreviewUrl = null) {
     aiEnabled: aiEnabled,
     aiModel: aiModel,
     fieldEvidence: fieldEvidence,
-    fieldConfidence: fieldConfidence
+    fieldConfidence: fieldConfidence,
+    fieldBoundingBoxes: fieldBoundingBoxes,
+    evidenceList: dynamicEvidenceList,
+    ruleEngineVersion: comp.ruleEngineVersion || 'LM-PCR-2026.01',
+    violations: Array.isArray(comp.violations) ? comp.violations : [],
+    warnings: Array.isArray(comp.warnings) ? comp.warnings : [],
+    manualReviewItems: Array.isArray(comp.manualReviewItems) ? comp.manualReviewItems : [],
+    passedChecks: Array.isArray(comp.passedChecks) ? comp.passedChecks : [],
+    notDetectedItems: Array.isArray(comp.notDetectedItems) ? comp.notDetectedItems : [],
+    notApplicableItems: Array.isArray(comp.notApplicableItems) ? comp.notApplicableItems : [],
+    scoreBreakdown: Array.isArray(comp.scoreBreakdown) ? comp.scoreBreakdown : [],
+    applicabilityProfile: comp.applicabilityProfile || null
   };
 }
 
@@ -295,8 +328,8 @@ export function formatLanguageDisplay(langCode) {
 /**
  * Maps statutory compliance status codes into human-readable, accessible display labels.
  *
- * @param {string} status Raw status ('PASS', 'WARNING', 'VIOLATION')
- * @returns {string} User-friendly label ('COMPLIANT', 'NEEDS REVIEW', 'POTENTIAL VIOLATION')
+ * @param {string} status Raw status ('PASS', 'WARNING', 'VIOLATION', 'FAIL', 'REQUIRES_MANUAL_VERIFICATION', 'NOT_DETECTED', 'NOT_APPLICABLE')
+ * @returns {string} User-friendly label
  */
 export function formatStatusDisplay(status) {
   if (!status) return 'NEEDS REVIEW';
@@ -306,7 +339,14 @@ export function formatStatusDisplay(status) {
     case 'WARNING':
       return 'NEEDS REVIEW';
     case 'VIOLATION':
+    case 'FAIL':
       return 'POTENTIAL VIOLATION';
+    case 'REQUIRES_MANUAL_VERIFICATION':
+      return 'REQUIRES MANUAL VERIFICATION';
+    case 'NOT_DETECTED':
+      return 'NOT DETECTED IN IMAGE';
+    case 'NOT_APPLICABLE':
+      return 'EXEMPT / NOT APPLICABLE';
     default:
       return status;
   }

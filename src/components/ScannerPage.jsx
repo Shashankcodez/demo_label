@@ -334,21 +334,21 @@ export default function ScannerPage({
           </div>
 
           {/* Quick Retake Photography Checklist */}
-          <div className="mt-3.5 pt-3 border-t border-rose-200/80 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-rose-900">
-            <div className="flex items-center gap-1.5">
-              <span>📸</span>
+          <div className="mt-3.5 pt-3 border-t border-rose-200/80 grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs sm:text-sm text-rose-950 font-medium">
+            <div className="flex items-center gap-2">
+              <span className="text-base">📸</span>
               <span>Hold camera steady & tap text to focus</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span>💡</span>
+            <div className="flex items-center gap-2">
+              <span className="text-base">💡</span>
               <span>Angle package slightly away from light to prevent glare</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span>📐</span>
+            <div className="flex items-center gap-2">
+              <span className="text-base">📐</span>
               <span>Smooth out wrapper folds flat before snapping</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span>🔍</span>
+            <div className="flex items-center gap-2">
+              <span className="text-base">🔍</span>
               <span>Capture the entire Principal Display Panel</span>
             </div>
           </div>
@@ -391,10 +391,10 @@ export default function ScannerPage({
               <Globe className="w-4 h-4" />
             </div>
             <div>
-              <label htmlFor="ocr-language" className="text-xs sm:text-sm font-bold text-slate-800 block cursor-pointer">
+              <label htmlFor="ocr-language" className="text-sm font-bold text-slate-800 block cursor-pointer">
                 OCR Language
               </label>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-xs text-slate-500 font-medium">
                 Default: English. Choose bilingual mode for Indian packaging scripts.
               </p>
             </div>
@@ -439,10 +439,10 @@ export default function ScannerPage({
               <UploadCloud className="w-8 h-8" />
             </div>
 
-            <h3 className="text-base sm:text-lg font-bold text-slate-800">
+            <h3 className="text-lg sm:text-xl font-bold text-slate-800">
               Upload Label Photograph
             </h3>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-sm mx-auto">
+            <p className="text-sm sm:text-base text-slate-600 mt-1 max-w-md mx-auto">
               Drag and drop your packaging image here, or browse from your device
             </p>
 
@@ -452,7 +452,7 @@ export default function ScannerPage({
                 type="button"
                 id="camera-capture-btn"
                 onClick={() => cameraInputRef.current?.click()}
-                className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-gov-blue text-white hover:bg-blue-700 shadow-sm flex items-center gap-2 active:scale-95 transition-all"
+                className="px-5 py-3 rounded-xl text-sm font-bold bg-gov-blue text-white hover:bg-blue-700 shadow-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
               >
                 <Camera className="w-4 h-4" />
                 Use Phone Camera
@@ -462,14 +462,14 @@ export default function ScannerPage({
                 type="button"
                 id="browse-file-btn"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm flex items-center gap-2 active:scale-95 transition-all"
+                className="px-5 py-3 rounded-xl text-sm font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
               >
                 <ImageIcon className="w-4 h-4 text-slate-500" />
                 Browse Gallery
               </button>
             </div>
 
-            <p className="text-[11px] text-slate-400 mt-5">
+            <p className="text-xs text-slate-500 mt-5 font-medium">
               Supports JPEG, PNG, WEBP • Ensures optimal OCR when label text is sharp & glare-free
             </p>
           </div>
@@ -479,11 +479,11 @@ export default function ScannerPage({
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span className="text-xs sm:text-sm font-bold text-slate-800 truncate max-w-[200px] sm:max-w-md">
+                <span className="text-sm sm:text-base font-bold text-slate-800 truncate max-w-[200px] sm:max-w-md">
                   {selectedImageName}
                 </span>
                 {activeDemoPreset && (
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-gov-blue">
+                  <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-blue-100 text-gov-blue">
                     Demo Preset
                   </span>
                 )}
@@ -521,13 +521,13 @@ export default function ScannerPage({
               {activeDemoPreset ? (
                 <div className="p-6 text-center text-white max-w-md">
                   <span className="text-4xl sm:text-5xl block mb-2">{activeDemoPreset.imageEmoji}</span>
-                  <h4 className="text-base sm:text-lg font-bold font-display">{activeDemoPreset.name}</h4>
-                  <p className="text-xs text-slate-300 mt-1 font-mono line-clamp-2">
+                  <h4 className="text-lg sm:text-xl font-bold font-display">{activeDemoPreset.name}</h4>
+                  <p className="text-xs sm:text-sm text-slate-300 mt-1 font-mono line-clamp-2">
                     {activeDemoPreset.labelSnippet}
                   </p>
                   <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                     {activeDemoPreset.detectedFieldsCount !== undefined && (
-                      <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                      <span className={`text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider ${
                         activeDemoPreset.qualityTier === 'GOOD_LABEL' ? 'bg-emerald-500 text-white' :
                         activeDemoPreset.qualityTier === 'AVERAGE_LABEL' ? 'bg-amber-500 text-white' :
                         activeDemoPreset.qualityTier === 'POOR_LABEL' ? 'bg-orange-500 text-white' :
@@ -539,7 +539,7 @@ export default function ScannerPage({
                          'Very Poor Image (0 Fields • Retake)'}
                       </span>
                     )}
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/20">
+                    <span className="text-xs font-bold px-2.5 py-1 rounded bg-white/20">
                       Outcome: {activeDemoPreset.complianceOutcome || activeDemoPreset.status}
                     </span>
                   </div>
@@ -555,7 +555,7 @@ export default function ScannerPage({
 
             {/* Action Bar */}
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div className="text-xs text-slate-500 text-center sm:text-left">
+              <div className="text-xs sm:text-sm text-slate-600 text-center sm:text-left">
                 Ready for extraction. Click <strong>Analyze Label</strong> to run Legal Metrology checks.
               </div>
 
@@ -563,7 +563,7 @@ export default function ScannerPage({
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl border border-slate-300 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
                   Clear
                 </button>
@@ -572,7 +572,7 @@ export default function ScannerPage({
                   id="analyze-label-btn"
                   disabled={isAnalyzing}
                   onClick={handleStartAnalysis}
-                  className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-gov-blue hover:bg-blue-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-900/20 active:scale-95 transition-all ${
+                  className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-gov-blue hover:bg-blue-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-md shadow-blue-900/20 active:scale-95 transition-all cursor-pointer ${
                     isAnalyzing ? 'opacity-60 cursor-not-allowed' : ''
                   }`}
                 >
@@ -591,11 +591,11 @@ export default function ScannerPage({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-500" />
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+            <h3 className="text-sm sm:text-base font-bold text-slate-800 uppercase tracking-wider">
               Test Quality Tiers & Field Yields (Instant Load)
             </h3>
           </div>
-          <span className="text-xs text-slate-500">
+          <span className="text-xs sm:text-sm text-slate-600 font-medium">
             Good (12 fields) • Average (7 fields) • Poor (3 fields) • Very Poor (0 fields / Retake)
           </span>
         </div>
@@ -611,7 +611,7 @@ export default function ScannerPage({
               <div
                 key={preset.id}
                 onClick={() => handleSelectDemo(preset)}
-                className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                className={`p-4 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
                   isSelected
                     ? 'border-gov-blue bg-blue-50/70 ring-2 ring-blue-500/20 shadow-sm'
                     : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80 shadow-subtle'
@@ -620,7 +620,7 @@ export default function ScannerPage({
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-2xl">{preset.imageEmoji}</span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border ${
+                    <span className={`px-2.5 py-0.5 rounded text-xs font-black uppercase tracking-wider border ${
                       isGood ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
                       isAverage ? 'bg-amber-50 text-amber-800 border-amber-200' :
                       isPoor ? 'bg-orange-50 text-orange-800 border-orange-200' :
@@ -633,21 +633,21 @@ export default function ScannerPage({
                     </span>
                   </div>
 
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 line-clamp-1">
+                  <h4 className="text-sm sm:text-base font-bold text-slate-900 line-clamp-1">
                     {preset.name}
                   </h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
                     {preset.category}
                   </p>
 
-                  <div className="mt-2 text-[10px] font-semibold text-slate-600">
+                  <div className="mt-2 text-xs font-semibold text-slate-600">
                     Outcome: <span className="font-bold text-slate-900">{preset.complianceOutcome || preset.status}</span>
                   </div>
                 </div>
 
-                <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-gov-blue">
+                <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm font-bold text-gov-blue">
                   <span>{isSelected ? 'Loaded in Preview' : 'Test Tier'}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <ArrowRight className="w-4 h-4" />
                 </div>
               </div>
             );
@@ -677,17 +677,17 @@ export default function ScannerPage({
               </div>
             </div>
 
-            <h3 className="text-lg font-bold text-slate-900 mb-1">
+            <h3 className="text-xl font-bold text-slate-900 mb-1">
               Analyzing Commodity Label
             </h3>
-            <p className="text-xs text-slate-500 mb-6">
+            <p className="text-xs sm:text-sm text-slate-500 mb-6 font-medium">
               Checking Legal Metrology (Packaged Commodities) Rules 2011
             </p>
 
             {/* Stepped Progress Checklist */}
-            <div className="space-y-2.5 text-left mb-6 text-xs bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+            <div className="space-y-3 text-left mb-6 text-xs sm:text-sm bg-slate-50 p-4 rounded-xl border border-slate-200/80">
               <div className={`flex items-center gap-2.5 transition-colors ${
-                analysisProgress >= 25 ? 'text-emerald-700 font-semibold' : 'text-slate-400'
+                analysisProgress >= 25 ? 'text-emerald-700 font-semibold' : 'text-slate-500'
               }`}>
                 {analysisProgress >= 25 ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -699,7 +699,7 @@ export default function ScannerPage({
 
               <div className={`flex items-center gap-2.5 transition-colors ${
                 analysisProgress >= 50 ? 'text-emerald-700 font-semibold' : 
-                analysisProgress >= 25 ? 'text-blue-700 font-semibold' : 'text-slate-400'
+                analysisProgress >= 25 ? 'text-blue-700 font-semibold' : 'text-slate-500'
               }`}>
                 {analysisProgress >= 50 ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -713,7 +713,7 @@ export default function ScannerPage({
 
               <div className={`flex items-center gap-2.5 transition-colors ${
                 analysisProgress >= 75 ? 'text-emerald-700 font-semibold' : 
-                analysisProgress >= 50 ? 'text-blue-700 font-semibold' : 'text-slate-400'
+                analysisProgress >= 50 ? 'text-blue-700 font-semibold' : 'text-slate-500'
               }`}>
                 {analysisProgress >= 75 ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -727,7 +727,7 @@ export default function ScannerPage({
 
               <div className={`flex items-center gap-2.5 transition-colors ${
                 analysisProgress >= 100 ? 'text-emerald-700 font-semibold' : 
-                analysisProgress >= 75 ? 'text-blue-700 font-semibold' : 'text-slate-400'
+                analysisProgress >= 75 ? 'text-blue-700 font-semibold' : 'text-slate-500'
               }`}>
                 {analysisProgress >= 100 ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -741,13 +741,13 @@ export default function ScannerPage({
             </div>
 
             {/* Progress Bar */}
-            <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden mb-2">
+            <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden mb-2">
               <div 
-                className="bg-gov-blue h-2 rounded-full transition-all duration-300"
+                className="bg-gov-blue h-2.5 rounded-full transition-all duration-300"
                 style={{ width: `${analysisProgress}%` }}
               ></div>
             </div>
-            <div className="flex justify-between text-[11px] text-slate-400 font-mono">
+            <div className="flex justify-between text-xs text-slate-500 font-mono font-medium">
               <span>Status: {analysisStep}</span>
               <span>{analysisProgress}%</span>
             </div>

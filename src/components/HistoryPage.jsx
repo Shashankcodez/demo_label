@@ -206,46 +206,46 @@ export default function HistoryPage({
             <button
               onClick={() => fetchBackendHistory(currentPage)}
               disabled={isLoading}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 flex items-center gap-1.5 transition-colors shadow-subtle disabled:opacity-60"
+              className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 flex items-center gap-2 transition-colors shadow-subtle disabled:opacity-60 cursor-pointer"
               title="Refresh database records"
             >
-              <RotateCcw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+              <RotateCcw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
               <span>Refresh</span>
             </button>
           ) : (
             <button
               onClick={onResetHistory}
-              className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 flex items-center gap-1.5 transition-colors shadow-subtle"
+              className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 flex items-center gap-2 transition-colors shadow-subtle cursor-pointer"
               title="Reset demo samples"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <RotateCcw className="w-4 h-4" />
               Reset Demo
             </button>
           )}
 
           <button
             onClick={onScanNew}
-            className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gov-blue hover:bg-blue-700 flex items-center gap-1.5 transition-colors shadow-sm"
+            className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gov-blue hover:bg-blue-700 flex items-center gap-2 transition-colors shadow-sm cursor-pointer"
           >
-            <Scan className="w-3.5 h-3.5" />
+            <Scan className="w-4 h-4" />
             Scan New
           </button>
         </div>
       </div>
 
       {/* Real Database vs Demo Presets Source Switcher */}
-      <div className="flex items-center gap-2 mb-6">
+      <div className="flex items-center gap-2.5 mb-6">
         <button
           onClick={() => setActiveSource('backend')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
             activeSource === 'backend'
               ? 'bg-gov-blue text-white shadow-sm'
               : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
           }`}
         >
-          <Database className="w-3.5 h-3.5" />
+          <Database className="w-4 h-4" />
           <span>Real Database Scans</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
             activeSource === 'backend' ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-700'
           }`}>
             {totalElements}
@@ -254,15 +254,15 @@ export default function HistoryPage({
 
         <button
           onClick={() => setActiveSource('demo')}
-          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
             activeSource === 'demo'
               ? 'bg-gov-blue text-white shadow-sm'
               : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
           }`}
         >
-          <Layers className="w-3.5 h-3.5" />
+          <Layers className="w-4 h-4" />
           <span>Demo Samples</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
             activeSource === 'demo' ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-700'
           }`}>
             {demoHistoryList?.length || 4}
@@ -305,10 +305,10 @@ export default function HistoryPage({
         </div>
 
         {/* Filter Badges */}
-        <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
           <button
             onClick={() => setStatusFilter('ALL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all cursor-pointer ${
               statusFilter === 'ALL'
                 ? 'bg-slate-900 text-white'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -319,37 +319,37 @@ export default function HistoryPage({
 
           <button
             onClick={() => setStatusFilter('PASS')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1 ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
               statusFilter === 'PASS'
                 ? 'bg-emerald-600 text-white'
                 : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
             }`}
           >
-            <CheckCircle2 className="w-3 h-3" />
+            <CheckCircle2 className="w-4 h-4" />
             Pass
           </button>
 
           <button
             onClick={() => setStatusFilter('WARNING')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1 ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
               statusFilter === 'WARNING'
                 ? 'bg-amber-600 text-white'
                 : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
             }`}
           >
-            <AlertTriangle className="w-3 h-3" />
+            <AlertTriangle className="w-4 h-4" />
             Warning
           </button>
 
           <button
             onClick={() => setStatusFilter('VIOLATION')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1 ${
+            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
               statusFilter === 'VIOLATION'
                 ? 'bg-red-600 text-white'
                 : 'bg-red-50 text-red-700 hover:bg-red-100'
             }`}
           >
-            <XCircle className="w-3 h-3" />
+            <XCircle className="w-4 h-4" />
             Violation
           </button>
         </div>
@@ -426,24 +426,24 @@ export default function HistoryPage({
                   </div>
 
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`px-2.5 py-0.5 rounded text-xs font-extrabold uppercase ${
                         isPass ? 'bg-emerald-100 text-emerald-800' :
                         isWarning ? 'bg-amber-100 text-amber-900' :
                         'bg-red-100 text-red-900'
                       }`}>
                         {formatStatusDisplay(item.status)}
                       </span>
-                      <span className="text-xs text-slate-500 font-medium">
+                      <span className="text-xs sm:text-sm text-slate-600 font-medium">
                         {item.category}
                       </span>
                       {item.language && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
                           {formatLanguageDisplay(item.language)}
                         </span>
                       )}
                       {item.isRealScan && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-blue-50 text-gov-blue border border-blue-100">
+                        <span className="px-2 py-0.5 rounded text-xs font-mono font-semibold bg-blue-50 text-gov-blue border border-blue-100">
                           H2 Database
                         </span>
                       )}
@@ -453,9 +453,9 @@ export default function HistoryPage({
                       {item.name}
                     </h3>
 
-                    <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3 text-slate-400" />
+                    <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-500 mt-1 font-medium">
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
                         {item.scannedAt}
                       </span>
                       <span>•</span>
@@ -467,14 +467,14 @@ export default function HistoryPage({
                 {/* Right score and view button */}
                 <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                   <div className="text-left sm:text-right">
-                    <div className="text-[10px] uppercase font-bold text-slate-400">
+                    <div className="text-xs uppercase font-bold text-slate-500">
                       Screening Score
                     </div>
-                    <div className={`text-lg sm:text-xl font-black font-display ${
+                    <div className={`text-xl sm:text-2xl font-black font-display ${
                       item.score >= 85 ? 'text-emerald-700' :
                       item.score >= 50 ? 'text-amber-700' : 'text-red-700'
                     }`}>
-                      {item.score} <span className="text-xs font-normal text-slate-400">/ 100</span>
+                      {item.score} <span className="text-xs sm:text-sm font-normal text-slate-400">/ 100</span>
                     </div>
                   </div>
 
@@ -494,7 +494,7 @@ export default function HistoryPage({
 
       {/* Pagination Controls (for real database scans) */}
       {activeSource === 'backend' && totalPages > 1 && (
-        <div className="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+        <div className="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between text-xs sm:text-sm text-slate-600 font-medium">
           <div>
             Page <strong className="text-slate-800">{currentPage + 1}</strong> of <strong className="text-slate-800">{totalPages}</strong> ({totalElements} total scans)
           </div>
@@ -502,18 +502,18 @@ export default function HistoryPage({
             <button
               onClick={() => fetchBackendHistory(currentPage - 1)}
               disabled={currentPage <= 0 || isLoading}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 font-semibold"
+              className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 font-semibold cursor-pointer"
             >
-              <ChevronLeft className="w-3.5 h-3.5" />
+              <ChevronLeft className="w-4 h-4" />
               Previous
             </button>
             <button
               onClick={() => fetchBackendHistory(currentPage + 1)}
               disabled={currentPage >= totalPages - 1 || isLoading}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 font-semibold"
+              className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 font-semibold cursor-pointer"
             >
               Next
-              <ChevronRight className="w-3.5 h-3.5" />
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         </div>

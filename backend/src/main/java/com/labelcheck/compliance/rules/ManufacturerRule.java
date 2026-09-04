@@ -20,6 +20,11 @@ public class ManufacturerRule implements ComplianceRule {
     private static final String TITLE = "Manufacturer / Packer / Marketer Details";
 
     @Override
+    public String getRuleId() {
+        return RULE_ID;
+    }
+
+    @Override
     public ComplianceCheck evaluate(StructuredLabelData labelData) {
         String mfg = labelData.manufacturerName();
         String imp = labelData.importerName();

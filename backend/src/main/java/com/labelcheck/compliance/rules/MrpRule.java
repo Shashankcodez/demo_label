@@ -19,6 +19,11 @@ public class MrpRule implements ComplianceRule {
     private static final String TITLE = "Maximum Retail Price (MRP) Declaration";
 
     @Override
+    public String getRuleId() {
+        return RULE_ID;
+    }
+
+    @Override
     public ComplianceCheck evaluate(StructuredLabelData labelData) {
         String mrp = labelData.mrp();
 

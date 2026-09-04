@@ -20,6 +20,11 @@ public class DateMarkingRule implements ComplianceRule {
     private static final String TITLE = "Date of Manufacture, Packing, or Expiry";
 
     @Override
+    public String getRuleId() {
+        return RULE_ID;
+    }
+
+    @Override
     public ComplianceCheck evaluate(StructuredLabelData labelData) {
         String mfd = labelData.manufactureOrPackingDate();
         String exp = labelData.bestBeforeOrExpiry();

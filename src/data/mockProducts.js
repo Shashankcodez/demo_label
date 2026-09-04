@@ -3,6 +3,116 @@
 
 export const SAMPLE_PRODUCTS = [
   {
+    id: "demo-sunfloweroil",
+    name: "ABC Premium Sunflower Oil",
+    brand: "ABC",
+    category: "Packaged Food",
+    packageType: "Retail Package",
+    barcode: "SCAN-2026-00017",
+    scanId: "SCAN-2026-00017",
+    scannedAt: "26 Jul 2026, 11:24 AM",
+    mrp: "MRP ₹145 Inclusive of All Taxes",
+    mrpRaw: "145",
+    mrpInclusiveOfTaxes: true,
+    unitSalePrice: "₹145/L",
+    netQuantity: "1 L",
+    netQuantityRaw: "1 L",
+    fontHeightDetected: "Text detected, size not verifiable",
+    fontHeightRequired: "Schedule II Table area ratio",
+    mfgDate: "Packed on: 06/2026",
+    expiryDate: "Best before 9 months from packaging",
+    countryOfOrigin: "Not clearly detected",
+    fssaiLicense: "10014022002725",
+    manufacturer: "ABC Foods Pvt Ltd",
+    manufacturerAddress: "12 Industrial Area, Hyderabad - 500001",
+    packerDetails: "Same as Manufacturer / Packer",
+    customImageUrl: "/sample_sunflower_oil.png",
+    customerCare: {
+      officer: "Customer Care Cell",
+      phone: "1800-123-4567",
+      email: "care@abcfoods.in",
+      address: "12 Industrial Area, Hyderabad - 500001"
+    },
+    overallScore: 84,
+    status: "REQUIRES_MANUAL_REVIEW",
+    summary: "The package appears to contain most required declarations. However, some requirements cannot be conclusively verified from the provided image.",
+    ruleEngineVersion: "LM-PCR-2026.01",
+    imageBadgeColor: "from-amber-600 to-yellow-700",
+    imageEmoji: "🌻",
+    passedChecks: [
+      { id: "p-1", title: "Generic Commodity Name", status: "PASS" },
+      { id: "p-2", title: "Net Quantity", status: "PASS" },
+      { id: "p-3", title: "Maximum Retail Price (MRP)", status: "PASS" },
+      { id: "p-4", title: "Unit Sale Price", status: "PASS" },
+      { id: "p-5", title: "Manufacturer / Packer Details", status: "PASS" },
+      { id: "p-6", title: "Manufacture / Packing Date", status: "PASS" },
+      { id: "p-7", title: "Consumer Care Telephone", status: "PASS" },
+      { id: "p-8", title: "Consumer Care Email", status: "PASS" },
+      { id: "p-9", title: "Standard Metric Symbol", status: "PASS" },
+      { id: "p-10", title: "Retail Tax Qualification", status: "PASS" },
+      { id: "p-11", title: "FSSAI Registration Format", status: "PASS" }
+    ],
+    warnings: [
+      {
+        id: "warn-legibility",
+        title: "Legibility",
+        explanation: "Potentially low visual contrast was detected around the MRP declaration. This may affect readability, but the image alone is not sufficient to establish a statutory violation.",
+        recommendation: "Inspect the physical package to confirm legibility.",
+        rule: "Rule 9"
+      },
+      {
+        id: "warn-quantity-wording",
+        title: "Quantity Wording",
+        explanation: "The phrase \"when packed\" was detected near the quantity declaration. The applicability of this wording depends on the commodity and the conditions specified under the applicable rules.",
+        recommendation: "Verify the wording manually.",
+        rule: "Rule 12"
+      }
+    ],
+    manualReviewItems: [
+      {
+        id: "mr-font-size",
+        number: 1,
+        title: "Font Size",
+        explanation: "The system detected the declaration text but could not determine its physical height in millimetres.",
+        action: "Verify the character height using the physical package."
+      },
+      {
+        id: "mr-pdp",
+        number: 2,
+        title: "Principal Display Panel",
+        explanation: "The package geometry could not be reliably reconstructed from the 2D photograph.",
+        action: "Verify the applicable Principal Display Panel dimensions manually."
+      },
+      {
+        id: "mr-origin",
+        number: 3,
+        title: "Country of Origin",
+        explanation: "Could not determine with sufficient confidence whether the package is imported or domestically manufactured.",
+        action: "Verify import status and the applicable declaration."
+      }
+    ],
+    violations: [],
+    checks: [
+      { id: "c-1", rule: "Rule 6(1)(l)", title: "Generic Commodity Name", status: "PASS", detected: "Sunflower Oil", legalReason: "Complies with commodity identification.", recommendation: "Properly declared.", severity: "none" },
+      { id: "c-2", rule: "Rule 6(1)(c)", title: "Net Quantity", status: "PASS", detected: "1 L", legalReason: "Complies with standard metric units.", recommendation: "Properly declared.", severity: "none" },
+      { id: "c-3", rule: "Rule 6(1)(e)", title: "Maximum Retail Price (MRP)", status: "PASS", detected: "MRP ₹145 Inclusive of All Taxes", legalReason: "Retail price inclusive of all taxes.", recommendation: "Properly declared.", severity: "none" },
+      { id: "c-4", rule: "Rule 6(1)(e) Amend.", title: "Unit Sale Price", status: "PASS", detected: "₹145/L", legalReason: "Unit sale price declared per standard litre.", recommendation: "Properly declared.", severity: "none" },
+      { id: "c-5", rule: "Rule 6(1)(a)", title: "Manufacturer / Packer Details", status: "PASS", detected: "ABC Foods Pvt Ltd, Hyderabad", legalReason: "Manufacturer name and location provided.", recommendation: "Properly declared.", severity: "none" },
+      { id: "c-6", rule: "Rule 6(1)(d)", title: "Manufacture / Packing Date", status: "PASS", detected: "Packed on: 06/2026", legalReason: "Packing date clearly stated.", recommendation: "Properly declared.", severity: "none" },
+      { id: "c-7", rule: "Rule 6(1)(n)", title: "Consumer Care Telephone", status: "PASS", detected: "1800-123-4567", legalReason: "Toll-free consumer care phone line provided.", recommendation: "Properly declared.", severity: "none" },
+      { id: "c-8", rule: "Rule 6(1)(n)", title: "Consumer Care Email", status: "PASS", detected: "care@abcfoods.in", legalReason: "Customer grievance email provided.", recommendation: "Properly declared.", severity: "none" },
+      { id: "c-9", rule: "Rule 6(10)", title: "Country of Origin (if imported)", status: "REQUIRES_MANUAL_VERIFICATION", detected: "Not clearly detected", legalReason: "Import status could not be determined confidently.", recommendation: "Verify applicable declaration.", severity: "medium" },
+      { id: "c-10", rule: "Rule 7 (Schedule II)", title: "Font Size (as per rules)", status: "REQUIRES_MANUAL_VERIFICATION", detected: "Text detected, size not verifiable", legalReason: "Physical text height cannot be established from 2D image.", recommendation: "Verify against the physical package.", severity: "medium" },
+      { id: "c-11", rule: "Rule 2(h) / Schedule I", title: "Principal Display Panel", status: "REQUIRES_MANUAL_VERIFICATION", detected: "Not clearly verifiable", legalReason: "Package dimensions cannot be reliably reconstructed.", recommendation: "Verify physical package geometry.", severity: "medium" }
+    ],
+    evidenceList: [
+      { id: "ev-mrp", title: "MRP Evidence", imageUrl: "/evidence_mrp.png", caption: "MRP ₹145 Incl. of All Taxes", field: "Maximum Retail Price" },
+      { id: "ev-qty", title: "Net Quantity Evidence", imageUrl: "/evidence_qty.png", caption: "1L Net Quantity", field: "Net Quantity" },
+      { id: "ev-mfg", title: "Manufacturer Evidence", imageUrl: "/evidence_mfg.png", caption: "ABC Foods Pvt Ltd, Hyderabad", field: "Manufacturer / Packer" },
+      { id: "ev-care", title: "Consumer Care Evidence", imageUrl: "/evidence_care.png", caption: "1800-123-4567, care@abcfoods.in", field: "Consumer Care Contact" }
+    ]
+  },
+  {
     id: "demo-haldirams",
     name: "Haldiram's Nagpur Aloo Bhujia (150g)",
     brand: "Haldiram's",

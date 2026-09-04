@@ -20,6 +20,11 @@ public class FssaiLicenseRule implements ComplianceRule {
     private static final String TITLE = "FSSAI Food License / Registration Number";
 
     @Override
+    public String getRuleId() {
+        return RULE_ID;
+    }
+
+    @Override
     public ComplianceCheck evaluate(StructuredLabelData labelData) {
         String fssaiStatus = labelData.fssaiStatus();
         String fssai = labelData.fssaiLicenseNumber();

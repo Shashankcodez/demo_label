@@ -19,6 +19,11 @@ public class ConsumerCareRule implements ComplianceRule {
     private static final String TITLE = "Consumer Care / Grievance Redressal Mechanism";
 
     @Override
+    public String getRuleId() {
+        return RULE_ID;
+    }
+
+    @Override
     public ComplianceCheck evaluate(StructuredLabelData labelData) {
         String phone = labelData.customerCarePhone();
         String email = labelData.customerCareEmail();

@@ -5,7 +5,11 @@ package com.labelcheck.compliance;
  */
 public enum RuleSeverity {
     NONE,
+    INFO,
     LOW,
     MEDIUM,
-    HIGH
+    HIGH,
+    CRITICAL,
+    MANUAL_REVIEW
 }
+

@@ -19,6 +19,11 @@ public class UnitSalePriceRule implements ComplianceRule {
     private static final String TITLE = "Unit Sale Price (USP) Declaration";
 
     @Override
+    public String getRuleId() {
+        return RULE_ID;
+    }
+
+    @Override
     public ComplianceCheck evaluate(StructuredLabelData labelData) {
         String usp = labelData.unitSalePrice();
 

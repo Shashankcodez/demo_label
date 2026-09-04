@@ -23,10 +23,44 @@ const scanDebug = (...args) => {
 };
 
 export default function App() {
-  const [activePage, setActivePage] = useState('home'); // 'home' | 'scanner' | 'result' | 'history'
-  const [activeProduct, setActiveProduct] = useState(SAMPLE_PRODUCTS[0]); // Haldiram's by default
+  const [activePage, setActivePage] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const qPage = params.get('page');
+        if (qPage && ['home', 'scanner', 'result', 'history'].includes(qPage)) return qPage;
+        const hash = window.location.hash.replace('#', '');
+        if (hash && ['home', 'scanner', 'result', 'history'].includes(hash)) return hash;
+      }
+    } catch {
+      // fallback
+    }
+    return 'home';
+  });
+  const [activeProduct, setActiveProduct] = useState(SAMPLE_PRODUCTS[0]);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (window.location.hash.replace('#', '') !== activePage) {
+        window.location.hash = activePage;
+      }
+    } catch {
+      // ignore
+    }
+  }, [activePage]);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (['home', 'scanner', 'result', 'history'].includes(hash)) {
+        setActivePage(hash);
+      }
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   // Scan analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);

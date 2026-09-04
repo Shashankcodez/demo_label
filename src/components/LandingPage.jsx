@@ -32,7 +32,7 @@ export default function LandingPage({ onScanClick, onViewDemo, onSelectProduct, 
           
           {/* Government / SIH Banner Pill */}
           <div className="flex justify-center mb-6">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white shadow-sm border border-slate-300/80 text-xs font-semibold text-slate-700">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow-sm border border-slate-300/80 text-xs sm:text-sm font-semibold text-slate-700">
               <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span className="font-bold text-gov-blue">Smart India Hackathon 2026</span>
               <span className="text-slate-300">|</span>
@@ -81,16 +81,16 @@ export default function LandingPage({ onScanClick, onViewDemo, onSelectProduct, 
             </div>
 
             {/* Key Trust Signals */}
-            <div className="mt-8 pt-6 border-t border-slate-200/80 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs font-medium text-slate-500">
-              <div className="flex items-center gap-1.5">
+            <div className="mt-8 pt-6 border-t border-slate-200/80 flex flex-wrap items-center justify-center gap-6 sm:gap-10 text-xs sm:text-sm font-semibold text-slate-600">
+              <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                 <span>Legal Metrology Rule 6 Compliant</span>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                 <span>Unit Sale Price (USP) Check</span>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                 <span>FSSAI & Packer Norms</span>
               </div>
@@ -102,15 +102,15 @@ export default function LandingPage({ onScanClick, onViewDemo, onSelectProduct, 
           <div className="mt-12 sm:mt-16 max-w-4xl mx-auto bg-white/80 backdrop-blur rounded-2xl p-5 sm:p-6 border border-slate-200 shadow-gov">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-amber-500" />
                   Try a Pre-Configured Test Product
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs sm:text-sm text-slate-600 font-medium">
                   Instant analysis without taking a photo — test compliant and non-compliant samples:
                 </p>
               </div>
-              <span className="hidden sm:inline-block text-[11px] font-semibold text-gov-blue uppercase tracking-wider">
+              <span className="hidden sm:inline-block text-xs font-bold text-gov-blue uppercase tracking-wider">
                 Live Test Cases
               </span>
             </div>
@@ -120,30 +120,30 @@ export default function LandingPage({ onScanClick, onViewDemo, onSelectProduct, 
                 <div
                   key={prod.id}
                   onClick={() => onSelectProduct(prod)}
-                  className="group p-3.5 rounded-xl border border-slate-200 hover:border-gov-blue/50 hover:bg-blue-50/40 cursor-pointer transition-all duration-200 flex flex-col justify-between bg-white shadow-subtle hover:shadow-card"
+                  className="group p-4 rounded-xl border border-slate-200 hover:border-gov-blue/50 hover:bg-blue-50/40 cursor-pointer transition-all duration-200 flex flex-col justify-between bg-white shadow-subtle hover:shadow-card"
                 >
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-2xl">{prod.imageEmoji}</span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide ${
-                        prod.status === 'PASS' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
-                        prod.status === 'WARNING' ? 'bg-amber-100 text-amber-800 border border-amber-200' :
-                        'bg-red-100 text-red-800 border border-red-200'
+                      <span className={`px-2.5 py-0.5 rounded text-xs font-extrabold uppercase tracking-wide border ${
+                        prod.status === 'PASS' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
+                        prod.status === 'WARNING' ? 'bg-amber-100 text-amber-800 border-amber-200' :
+                        'bg-red-100 text-red-800 border-red-200'
                       }`}>
                         {prod.status} • {prod.overallScore}%
                       </span>
                     </div>
-                    <h4 className="text-xs sm:text-sm font-bold text-slate-800 group-hover:text-gov-blue transition-colors line-clamp-1">
+                    <h4 className="text-sm sm:text-base font-bold text-slate-800 group-hover:text-gov-blue transition-colors line-clamp-1">
                       {prod.name}
                     </h4>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
+                    <p className="text-xs text-slate-500 mt-0.5">
                       {prod.category}
                     </p>
                   </div>
                   
-                  <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-semibold text-gov-blue">
+                  <div className="mt-3.5 pt-2 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm font-bold text-gov-blue">
                     <span>Inspect Verdict</span>
-                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
               ))}
@@ -268,11 +268,11 @@ export default function LandingPage({ onScanClick, onViewDemo, onSelectProduct, 
                   <Scan className="w-5 h-5" />
                 </div>
                 <h4 className="text-base font-bold text-slate-900 mb-1">Upload / Capture</h4>
-                <p className="text-xs text-slate-600 leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                   Snap a picture of the back-of-pack or front-of-pack label using your smartphone camera or upload existing packaging artwork.
                 </p>
               </div>
-              <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-400 font-medium">
+              <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 font-semibold">
                 Step 1: Input Acquisition
               </div>
             </div>
@@ -285,11 +285,11 @@ export default function LandingPage({ onScanClick, onViewDemo, onSelectProduct, 
                   <FileSearch className="w-5 h-5" />
                 </div>
                 <h4 className="text-base font-bold text-slate-900 mb-1">Extract Label Information</h4>
-                <p className="text-xs text-slate-600 leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                   OCR extracts key declarations: MRP, Net Quantity, Mfg Date, Expiry, Manufacturer Address, Customer Care contacts, and Barcode.
                 </p>
               </div>
-              <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-400 font-medium">
+              <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 font-semibold">
                 Step 2: Entity Recognition
               </div>
             </div>
@@ -302,11 +302,11 @@ export default function LandingPage({ onScanClick, onViewDemo, onSelectProduct, 
                   <Scale className="w-5 h-5" />
                 </div>
                 <h4 className="text-base font-bold text-slate-900 mb-1">Check Compliance</h4>
-                <p className="text-xs text-slate-600 leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                   The rule engine validates units (g/kg/ml), font heights against package area, presence of tax declaration, and complaint redressal channels.
                 </p>
               </div>
-              <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-400 font-medium">
+              <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 font-semibold">
                 Step 3: Rule Verification
               </div>
             </div>
@@ -319,11 +319,11 @@ export default function LandingPage({ onScanClick, onViewDemo, onSelectProduct, 
                   <FileCheck2 className="w-5 h-5" />
                 </div>
                 <h4 className="text-base font-bold text-slate-900 mb-1">Get Report</h4>
-                <p className="text-xs text-slate-600 leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                   Receive an actionable score (0-100) with pass/fail badges, pinpointed violations, legal citations, and downloadable inspection certificates.
                 </p>
               </div>
-              <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-400 font-medium">
+              <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 font-semibold">
                 Step 4: Actionable Output
               </div>
             </div>
@@ -350,63 +350,63 @@ export default function LandingPage({ onScanClick, onViewDemo, onSelectProduct, 
               </p>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 text-xs">
-              <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700/60 flex items-start gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 text-xs sm:text-sm">
+              <div className="bg-slate-800/80 rounded-xl p-3.5 border border-slate-700/60 flex items-start gap-2.5">
                 <IndianRupee className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <div>
-                  <div className="font-bold text-slate-200">MRP & Unit Sale Price</div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">Incl. of all taxes + ₹/g or ₹/ml</div>
+                  <div className="font-bold text-slate-100">MRP & Unit Sale Price</div>
+                  <div className="text-xs text-slate-300 mt-0.5 font-normal">Incl. of all taxes + ₹/g or ₹/ml</div>
                 </div>
               </div>
 
-              <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700/60 flex items-start gap-2.5">
+              <div className="bg-slate-800/80 rounded-xl p-3.5 border border-slate-700/60 flex items-start gap-2.5">
                 <Scale className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
-                  <div className="font-bold text-slate-200">Net Quantity</div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">Standard metric unit & min font size</div>
+                  <div className="font-bold text-slate-100">Net Quantity</div>
+                  <div className="text-xs text-slate-300 mt-0.5 font-normal">Standard metric unit & min font size</div>
                 </div>
               </div>
 
-              <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700/60 flex items-start gap-2.5">
+              <div className="bg-slate-800/80 rounded-xl p-3.5 border border-slate-700/60 flex items-start gap-2.5">
                 <Building2 className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
                 <div>
-                  <div className="font-bold text-slate-200">Manufacturer Address</div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">Complete registered premise with PIN</div>
+                  <div className="font-bold text-slate-100">Manufacturer Address</div>
+                  <div className="text-xs text-slate-300 mt-0.5 font-normal">Complete registered premise with PIN</div>
                 </div>
               </div>
 
-              <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700/60 flex items-start gap-2.5">
+              <div className="bg-slate-800/80 rounded-xl p-3.5 border border-slate-700/60 flex items-start gap-2.5">
                 <Calendar className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
                 <div>
-                  <div className="font-bold text-slate-200">Mfg / Pkg Date</div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">Month, year and best-before validity</div>
+                  <div className="font-bold text-slate-100">Mfg / Pkg Date</div>
+                  <div className="text-xs text-slate-300 mt-0.5 font-normal">Month, year and best-before validity</div>
                 </div>
               </div>
 
-              <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700/60 flex items-start gap-2.5">
+              <div className="bg-slate-800/80 rounded-xl p-3.5 border border-slate-700/60 flex items-start gap-2.5">
                 <PhoneCall className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
                 <div>
-                  <div className="font-bold text-slate-200">Consumer Care</div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">Helpline phone, email & address</div>
+                  <div className="font-bold text-slate-100">Consumer Care</div>
+                  <div className="text-xs text-slate-300 mt-0.5 font-normal">Helpline phone, email & address</div>
                 </div>
               </div>
 
-              <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700/60 flex items-start gap-2.5">
+              <div className="bg-slate-800/80 rounded-xl p-3.5 border border-slate-700/60 flex items-start gap-2.5">
                 <ShieldCheck className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
                 <div>
-                  <div className="font-bold text-slate-200">Country of Origin</div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">Country & FSSAI Food Lic. No.</div>
+                  <div className="font-bold text-slate-100">Country of Origin</div>
+                  <div className="text-xs text-slate-300 mt-0.5 font-normal">Country & FSSAI Food Lic. No.</div>
                 </div>
               </div>
             </div>
 
             <div className="mt-8 pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <span className="text-xs text-slate-400 text-center sm:text-left">
+              <span className="text-xs sm:text-sm text-slate-300 text-center sm:text-left font-medium">
                 Empowering consumers and regulatory inspectors with AI verification.
               </span>
               <button
                 onClick={onScanClick}
-                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-white text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-1.5 shrink-0"
+                className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-white text-slate-900 hover:bg-slate-100 transition-colors flex items-center gap-2 shrink-0 cursor-pointer"
               >
                 <Scan className="w-4 h-4 text-gov-blue" />
                 Launch Label Scanner
@@ -417,7 +417,7 @@ export default function LandingPage({ onScanClick, onViewDemo, onSelectProduct, 
       </section>
 
       {/* Footer */}
-      <footer className="mt-12 border-t border-slate-200 bg-white py-8 text-center text-xs text-slate-500">
+      <footer className="mt-12 border-t border-slate-200 bg-white py-8 text-center text-xs sm:text-sm text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-800">LabelCheck</span>

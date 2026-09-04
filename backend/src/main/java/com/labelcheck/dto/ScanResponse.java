@@ -3,6 +3,7 @@ package com.labelcheck.dto;
 import com.labelcheck.compliance.ComplianceResult;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -58,8 +59,70 @@ public record ScanResponse(
         boolean aiEnabled,
         String aiModel,
         Map<String, String> fieldEvidence,
-        Map<String, Double> fieldConfidence
+        Map<String, Double> fieldConfidence,
+        Map<String, List<Integer>> fieldBoundingBoxes
 ) {
+    public ScanResponse {
+        if (fieldEvidence == null) fieldEvidence = Map.of();
+        if (fieldConfidence == null) fieldConfidence = Map.of();
+        if (fieldBoundingBoxes == null) fieldBoundingBoxes = Map.of();
+    }
+
+    /**
+     * Backward-compatible 23-parameter constructor.
+     */
+    public ScanResponse(
+            UUID scanId,
+            String filename,
+            String contentType,
+            long sizeBytes,
+            String status,
+            String text,
+            String ocrText,
+            String language,
+            String message,
+            StructuredLabelData extractedLabel,
+            ComplianceResult compliance,
+            Instant createdAt,
+            int detectedFieldsCount,
+            String labelQualityTier,
+            String complianceOutcome,
+            String qualityMessage,
+            String extractionSource,
+            String extractionStatus,
+            Double overallExtractionConfidence,
+            boolean aiEnabled,
+            String aiModel,
+            Map<String, String> fieldEvidence,
+            Map<String, Double> fieldConfidence
+    ) {
+        this(
+                scanId,
+                filename,
+                contentType,
+                sizeBytes,
+                status,
+                text,
+                ocrText,
+                language,
+                message,
+                extractedLabel,
+                compliance,
+                createdAt,
+                detectedFieldsCount,
+                labelQualityTier,
+                complianceOutcome,
+                qualityMessage,
+                extractionSource,
+                extractionStatus,
+                overallExtractionConfidence,
+                aiEnabled,
+                aiModel,
+                fieldEvidence,
+                fieldConfidence,
+                Map.of()
+        );
+    }
     /**
      * Backward-compatible 16-parameter constructor.
      */

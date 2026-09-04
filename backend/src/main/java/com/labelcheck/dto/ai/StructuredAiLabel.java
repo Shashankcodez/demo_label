@@ -37,11 +37,76 @@ public record StructuredAiLabel(
         FieldExtraction vegetarianSymbol,
         FieldExtraction storageInstructions,
         List<AiNutritionItem> nutrition,
-        List<String> otherDeclarations
+        List<String> otherDeclarations,
+        String fullTranscribedText
 ) {
     public StructuredAiLabel {
         if (nutrition == null) nutrition = new ArrayList<>();
         if (otherDeclarations == null) otherDeclarations = new ArrayList<>();
+    }
+
+    /**
+     * Backward-compatible constructor for 26 fields (without fullTranscribedText).
+     */
+    public StructuredAiLabel(
+            Double overallConfidence,
+            FieldExtraction productName,
+            FieldExtraction brand,
+            FieldExtraction netQuantity,
+            FieldExtraction mrp,
+            FieldExtraction mrpIncludesTaxes,
+            FieldExtraction unitSalePrice,
+            FieldExtraction batchNumber,
+            FieldExtraction manufacturedOrPackedDate,
+            FieldExtraction bestBeforeOrExpiry,
+            FieldExtraction fssaiLicenseNumber,
+            FieldExtraction fssaiStatus,
+            FieldExtraction manufacturer,
+            FieldExtraction packer,
+            FieldExtraction marketer,
+            FieldExtraction importer,
+            FieldExtraction address,
+            FieldExtraction countryOfOrigin,
+            FieldExtraction phone,
+            FieldExtraction email,
+            FieldExtraction consumerCare,
+            FieldExtraction ingredients,
+            FieldExtraction allergens,
+            FieldExtraction vegetarianSymbol,
+            FieldExtraction storageInstructions,
+            List<AiNutritionItem> nutrition,
+            List<String> otherDeclarations
+    ) {
+        this(
+                overallConfidence,
+                productName,
+                brand,
+                netQuantity,
+                mrp,
+                mrpIncludesTaxes,
+                unitSalePrice,
+                batchNumber,
+                manufacturedOrPackedDate,
+                bestBeforeOrExpiry,
+                fssaiLicenseNumber,
+                fssaiStatus,
+                manufacturer,
+                packer,
+                marketer,
+                importer,
+                address,
+                countryOfOrigin,
+                phone,
+                email,
+                consumerCare,
+                ingredients,
+                allergens,
+                vegetarianSymbol,
+                storageInstructions,
+                nutrition,
+                otherDeclarations,
+                null
+        );
     }
 
     /**

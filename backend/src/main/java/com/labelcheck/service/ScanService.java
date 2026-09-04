@@ -14,6 +14,7 @@ import com.labelcheck.dto.PageResponse;
 import com.labelcheck.dto.ScanResponse;
 import com.labelcheck.dto.ScanSummaryResponse;
 import com.labelcheck.dto.StructuredLabelData;
+import com.labelcheck.dto.ai.AiExtractionStatus;
 import com.labelcheck.dto.ai.AiLabelExtractionResult;
 import com.labelcheck.entity.ScanEntity;
 import com.labelcheck.exception.FileStorageException;
@@ -177,25 +178,43 @@ public class ScanService {
                 ? imagePreprocessingService.assessQuality(storedFilePath)
                 : new ImagePreprocessingService.QualityAssessment(false, "OK", 0, 0);
 
-        // 2. Run local Tesseract OCR as fallback & transparency evidence
-        OcrResult ocrResult = (language != null && !language.isBlank())
-                ? ocrService.extractText(storedFilePath, language)
-                : ocrService.extractText(storedFilePath);
-
-        StructuredLabelData ocrData = null;
-        if (ocrResult != null && ocrResult.text() != null && !ocrResult.text().isBlank()) {
-            ocrData = labelExtractionService.extract(ocrResult.text());
-        }
-
-        // 3. Run Vision AI extraction (Primary Source)
+        // 2. Run Vision AI extraction (Primary Source for ultra-fast, high-precision detection)
         AiLabelExtractionResult aiResult = null;
         if (visionLabelExtractor != null && visionLabelExtractor.isEnabled()) {
-            aiResult = visionLabelExtractor.extract(storedFilePath, contentType);
+            try {
+                aiResult = visionLabelExtractor.extract(storedFilePath, contentType);
+            } catch (Exception e) {
+                log.warn("Primary Vision AI extraction encountered an error: {}", e.getMessage());
+            }
+        }
+
+        // 3. Check if Vision AI succeeded with statutory declarations
+        boolean aiSucceeded = aiResult != null
+                && (aiResult.status() == AiExtractionStatus.AI_SUCCESS || aiResult.status() == AiExtractionStatus.AI_PARTIAL)
+                && aiResult.label() != null
+                && aiResult.label().countDetectedFields() > 0;
+
+        // Run local Tesseract OCR as fallback if Vision AI did not succeed or is disabled
+        OcrResult ocrResult = null;
+        StructuredLabelData ocrData = null;
+        if (!aiSucceeded && ocrService != null && ocrService.isAvailable()) {
+            try {
+                ocrResult = (language != null && !language.isBlank())
+                        ? ocrService.extractText(storedFilePath, language)
+                        : ocrService.extractText(storedFilePath);
+
+                if (ocrResult != null && ocrResult.text() != null && !ocrResult.text().isBlank()) {
+                    ocrData = labelExtractionService.extract(ocrResult.text());
+                }
+            } catch (Exception e) {
+                log.warn("Local OCR fallback encountered an error: {}", e.getMessage());
+            }
         }
 
         // 4. Merge Vision AI primary extraction with local OCR fallback
+        String fallbackRawText = ocrResult != null ? ocrResult.text() : "";
         ExtractionMergeService.MergedResult merged = (extractionMergeService != null)
-                ? extractionMergeService.merge(aiResult, ocrData, ocrResult != null ? ocrResult.text() : "", quality.isSuspect())
+                ? extractionMergeService.merge(aiResult, ocrData, fallbackRawText, quality.isSuspect())
                 : new ExtractionMergeService.MergedResult(
                         ocrData,
                         "TESSERACT_FALLBACK",
@@ -203,7 +222,9 @@ public class ScanService {
                         0.70,
                         Map.of(),
                         Map.of(),
-                        "Local OCR extraction"
+                        "Local OCR extraction",
+                        fallbackRawText,
+                        Map.of()
                 );
 
         StructuredLabelData labelData = merged.labelData();
@@ -239,8 +260,8 @@ public class ScanService {
                     "0 fields detected — automated compliance screening halted. Image quality is insufficient. Please retake the product photograph."
             );
         } else {
-            // Evaluate deterministic statutory packaging rules
-            complianceResult = complianceRuleEngine.evaluate(labelData);
+            // Evaluate deterministic statutory packaging rules with visual evidence & field confidences
+            complianceResult = complianceRuleEngine.evaluate(labelData, merged.fieldEvidence(), merged.fieldConfidence());
             status = "ANALYSIS_COMPLETE";
 
             if (detectedFieldsCount >= 10) {
@@ -263,6 +284,10 @@ public class ScanService {
                 ? aiResult.modelName()
                 : (isAiEnabled ? aiProperties.getModel() : null);
 
+        String effectiveFullText = (merged.fullTranscribedText() != null && !merged.fullTranscribedText().isBlank())
+                ? merged.fullTranscribedText()
+                : (ocrResult != null ? ocrResult.text() : "");
+
         // 6. Persist completed scan record to database
         Instant createdAt = persistScanRecord(
                 scanId,
@@ -270,7 +295,7 @@ public class ScanService {
                 contentType,
                 file.getSize(),
                 status,
-                ocrResult != null ? ocrResult.text() : "",
+                effectiveFullText,
                 labelData,
                 complianceResult,
                 merged.extractionSource(),
@@ -290,9 +315,9 @@ public class ScanService {
                 contentType,
                 file.getSize(),
                 status,
-                ocrResult != null ? ocrResult.text() : "",
-                ocrResult != null ? ocrResult.text() : "",
-                ocrResult != null ? ocrResult.language() : "eng",
+                effectiveFullText,
+                effectiveFullText,
+                ocrResult != null ? ocrResult.language() : (language != null ? language : "eng"),
                 message,
                 labelData,
                 complianceResult,
@@ -307,7 +332,8 @@ public class ScanService {
                 isAiEnabled,
                 aiModel,
                 merged.fieldEvidence(),
-                merged.fieldConfidence()
+                merged.fieldConfidence(),
+                merged.fieldBoundingBoxes()
         );
     }
 

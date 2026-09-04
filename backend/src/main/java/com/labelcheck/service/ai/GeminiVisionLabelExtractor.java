@@ -172,29 +172,30 @@ public class GeminiVisionLabelExtractor implements VisionLabelExtractor {
 
             Return ONLY a valid JSON object matching this schema:
             {
+              "fullTranscribedText": "Complete line-by-line verbatim transcription of all visible text on the packaging",
               "overallConfidence": 0.95,
-              "productName": { "value": "...", "confidence": 0.95, "evidence": "..." },
-              "brand": { "value": "...", "confidence": 0.90, "evidence": "..." },
-              "netQuantity": { "value": "...", "confidence": 0.95, "evidence": "..." },
-              "mrp": { "value": "...", "confidence": 0.95, "evidence": "..." },
+              "productName": { "value": "...", "confidence": 0.95, "evidence": "...", "box_2d": [100, 200, 150, 800] },
+              "brand": { "value": "...", "confidence": 0.90, "evidence": "...", "box_2d": [50, 200, 90, 400] },
+              "netQuantity": { "value": "...", "confidence": 0.95, "evidence": "...", "box_2d": [200, 100, 250, 300] },
+              "mrp": { "value": "...", "confidence": 0.95, "evidence": "...", "box_2d": [300, 100, 350, 300] },
               "mrpIncludesTaxes": { "value": "true/false", "confidence": 0.90, "evidence": "..." },
-              "unitSalePrice": { "value": "...", "confidence": 0.0, "evidence": "..." },
-              "batchNumber": { "value": "...", "confidence": 0.90, "evidence": "..." },
-              "manufacturedOrPackedDate": { "value": "...", "confidence": 0.95, "evidence": "..." },
-              "bestBeforeOrExpiry": { "value": "...", "confidence": 0.95, "evidence": "..." },
-              "fssaiLicenseNumber": { "value": "...", "confidence": 0.90, "evidence": "..." },
+              "unitSalePrice": { "value": "...", "confidence": 0.0, "evidence": "...", "box_2d": [350, 100, 400, 300] },
+              "batchNumber": { "value": "...", "confidence": 0.90, "evidence": "...", "box_2d": [400, 100, 450, 300] },
+              "manufacturedOrPackedDate": { "value": "...", "confidence": 0.95, "evidence": "...", "box_2d": [450, 100, 500, 300] },
+              "bestBeforeOrExpiry": { "value": "...", "confidence": 0.95, "evidence": "...", "box_2d": [500, 100, 550, 300] },
+              "fssaiLicenseNumber": { "value": "...", "confidence": 0.90, "evidence": "...", "box_2d": [550, 100, 600, 400] },
               "fssaiStatus": { "value": "NUMBER_DETECTED / APPLIED_FOR / TEXT_PRESENT_NUMBER_NEEDS_REVIEW / TEXT_PRESENT_NUMBER_NOT_CONFIRMED / NOT_DETECTED", "confidence": 0.95, "evidence": "..." },
               "fssaiTextPresent": { "value": "true/false", "confidence": 0.95, "evidence": "..." },
-              "manufacturer": { "value": "...", "confidence": 0.90, "evidence": "..." },
-              "packer": { "value": "...", "confidence": 0.90, "evidence": "..." },
-              "marketer": { "value": "...", "confidence": 0.90, "evidence": "..." },
+              "manufacturer": { "value": "...", "confidence": 0.90, "evidence": "...", "box_2d": [600, 100, 650, 500] },
+              "packer": { "value": "...", "confidence": 0.90, "evidence": "...", "box_2d": [650, 100, 700, 500] },
+              "marketer": { "value": "...", "confidence": 0.90, "evidence": "...", "box_2d": [700, 100, 750, 500] },
               "importer": { "value": null, "confidence": 0.0, "evidence": null },
-              "address": { "value": "...", "confidence": 0.90, "evidence": "..." },
-              "countryOfOrigin": { "value": "...", "confidence": 0.90, "evidence": "..." },
-              "phone": { "value": "...", "confidence": 0.90, "evidence": "..." },
-              "email": { "value": "...", "confidence": 0.90, "evidence": "..." },
-              "consumerCare": { "value": "...", "confidence": 0.90, "evidence": "..." },
-              "ingredients": { "value": "...", "confidence": 0.90, "evidence": "..." },
+              "address": { "value": "...", "confidence": 0.90, "evidence": "...", "box_2d": [750, 100, 800, 500] },
+              "countryOfOrigin": { "value": "...", "confidence": 0.90, "evidence": "...", "box_2d": [800, 100, 850, 300] },
+              "phone": { "value": "...", "confidence": 0.90, "evidence": "...", "box_2d": [850, 100, 900, 300] },
+              "email": { "value": "...", "confidence": 0.90, "evidence": "...", "box_2d": [900, 100, 950, 350] },
+              "consumerCare": { "value": "...", "confidence": 0.90, "evidence": "...", "box_2d": [850, 100, 950, 500] },
+              "ingredients": { "value": "...", "confidence": 0.90, "evidence": "...", "box_2d": [200, 500, 400, 900] },
               "allergens": { "value": "...", "confidence": 0.90, "evidence": "..." },
               "vegetarianSymbol": { "value": "vegetarian / nonVegetarian / unknown", "confidence": 0.90, "evidence": "..." },
               "storageInstructions": { "value": "...", "confidence": 0.90, "evidence": "..." },
@@ -203,6 +204,7 @@ public class GeminiVisionLabelExtractor implements VisionLabelExtractor {
               ],
               "otherDeclarations": ["..."]
             }
+            Note: "box_2d" must be normalized coordinates [ymin, xmin, ymax, xmax] scaled from 0 to 1000 representing the bounding box location on the primary image. If a field is not detected or location is uncertain, omit box_2d or set to null.
             """;
 
     private final AiProperties aiProperties;
@@ -303,18 +305,22 @@ public class GeminiVisionLabelExtractor implements VisionLabelExtractor {
                             modelName,
                             "Gemini authentication unavailable. Check GEMINI_API_KEY."
                     );
-                } else if (statusCode == 429) {
-                    log.warn("Gemini response received with HTTP status [429] (rate limited) for model [{}]. Attempt {}/{}", modelName, attempt, maxAttempts);
+                } else if (statusCode == 429 || statusCode == 503) {
+                    log.warn("Gemini response received with HTTP status [{}] (rate limited or model busy) for model [{}]. Attempt {}/{}", statusCode, modelName, attempt, maxAttempts);
                     if (attempt < maxAttempts) {
-                        if ("gemini-3.6-flash".equalsIgnoreCase(modelName)) {
-                            modelName = "gemini-3.5-flash";
-                            log.info("Gemini 3.6 Flash daily quota reached (429). Seamlessly switching to Gemini Flash companion [{}]", modelName);
-                        } else if ("gemini-3.5-flash".equalsIgnoreCase(modelName)) {
-                            modelName = "gemini-flash-latest";
-                            log.info("Gemini 3.5 Flash rate limited (429). Seamlessly switching to Gemini Flash companion [{}]", modelName);
+                        if ("gemini-3.1-flash-lite".equalsIgnoreCase(modelName)) {
+                            modelName = "gemini-3.1-flash-lite-preview";
+                            log.info("Switching to companion Gemini model [{}]", modelName);
+                        } else if ("gemini-3.1-flash-lite-preview".equalsIgnoreCase(modelName)) {
+                            modelName = "gemini-3.7-flash";
+                            log.info("Switching to companion Gemini model [{}]", modelName);
+                        } else if ("gemini-3.6-flash".equalsIgnoreCase(modelName) || "gemini-3.5-flash".equalsIgnoreCase(modelName)) {
+                            modelName = "gemini-3.1-flash-lite";
+                            log.info("Switching from legacy model to high-availability Gemini model [{}]", modelName);
                         } else {
+                            modelName = "gemini-3.1-flash-lite";
                             try {
-                                Thread.sleep(2000);
+                                Thread.sleep(1500);
                             } catch (InterruptedException ie) {
                                 Thread.currentThread().interrupt();
                             }
@@ -324,7 +330,7 @@ public class GeminiVisionLabelExtractor implements VisionLabelExtractor {
                     return AiLabelExtractionResult.failed(
                             AiExtractionStatus.AI_FAILED_TESSERACT_FALLBACK,
                             modelName,
-                            "Gemini request rate limit reached."
+                            "Gemini model temporarily unreachable (" + statusCode + ")."
                     );
                 } else if (statusCode >= 500) {
                     log.warn("Gemini response received with HTTP status [{}] (provider error). Attempt {}/{}", statusCode, attempt, maxAttempts);
@@ -614,6 +620,10 @@ public class GeminiVisionLabelExtractor implements VisionLabelExtractor {
             }
         }
 
+        String fullTranscribedText = node.hasNonNull("fullTranscribedText")
+                ? node.get("fullTranscribedText").asText(null)
+                : null;
+
         return new StructuredAiLabel(
                 overallConfidence,
                 productName,
@@ -641,7 +651,8 @@ public class GeminiVisionLabelExtractor implements VisionLabelExtractor {
                 vegSymbol,
                 storage,
                 nutritionList,
-                otherDeclarations
+                otherDeclarations,
+                fullTranscribedText
         );
     }
 
@@ -701,13 +712,33 @@ public class GeminiVisionLabelExtractor implements VisionLabelExtractor {
             String value = fieldNode.hasNonNull("value") ? fieldNode.get("value").asText(null) : null;
             Double confidence = fieldNode.hasNonNull("confidence") ? fieldNode.get("confidence").asDouble() : null;
             String evidence = fieldNode.hasNonNull("evidence") ? fieldNode.get("evidence").asText(null) : null;
-            return FieldExtraction.of(value, confidence, evidence);
+            List<Integer> box = parseBoundingBox(fieldNode);
+            return FieldExtraction.of(value, confidence, evidence, box);
         }
 
         String textVal = fieldNode.asText(null);
         Double conf = parent.hasNonNull(fieldName + "Confidence") ? parent.get(fieldName + "Confidence").asDouble() : 0.90;
         String ev = parent.hasNonNull(fieldName + "Evidence") ? parent.get(fieldName + "Evidence").asText(null) : "Visible on packaging label";
         return FieldExtraction.of(textVal, conf, ev);
+    }
+
+    private List<Integer> parseBoundingBox(JsonNode fieldNode) {
+        if (fieldNode == null) return null;
+        JsonNode boxNode = fieldNode.path("box_2d");
+        if (!boxNode.isArray() || boxNode.size() != 4) {
+            boxNode = fieldNode.path("boundingBox");
+        }
+        if (!boxNode.isArray() || boxNode.size() != 4) {
+            boxNode = fieldNode.path("box");
+        }
+        if (boxNode.isArray() && boxNode.size() == 4) {
+            List<Integer> coords = new ArrayList<>(4);
+            for (int i = 0; i < 4; i++) {
+                coords.add(boxNode.get(i).asInt());
+            }
+            return coords;
+        }
+        return null;
     }
 
     private FieldExtraction parseMrpField(JsonNode parent) {
@@ -717,16 +748,19 @@ public class GeminiVisionLabelExtractor implements VisionLabelExtractor {
         }
 
         String v = raw.value();
-        // Remove currency symbols, slashes, and trailing taxes note
-        String normalized = v.replaceAll("(?i)[₹Rs\\.\\s/\\-]+", "").trim();
+        // Remove currency symbols, slashes, and leading/trailing punctuation while PRESERVING decimal points
+        String normalized = v.replaceAll("(?i)^[₹Rs\\s\\-:]+", "")
+                             .replaceAll("[/\\-\\s]+$", "")
+                             .trim();
+        normalized = normalized.replaceAll("(?i)/-.*$", "").trim();
         normalized = normalized.replaceAll("[,;]+$", "").trim();
 
         // If numeric or decimal, return clean price
         if (normalized.matches("^[0-9]+(\\.[0-9]{1,2})?$")) {
-            return FieldExtraction.of(normalized, raw.confidence(), raw.evidence());
+            return FieldExtraction.of(normalized, raw.confidence(), raw.evidence(), raw.boundingBox());
         }
 
-        return FieldExtraction.of(raw.value().replaceAll("^[~\\-\\s]+", "").trim(), raw.confidence(), raw.evidence());
+        return FieldExtraction.of(raw.value().replaceAll("^[~\\-\\s]+", "").trim(), raw.confidence(), raw.evidence(), raw.boundingBox());
     }
 
     private FieldExtraction parseDateField(JsonNode parent, String fieldName) {
@@ -783,14 +817,14 @@ public class GeminiVisionLabelExtractor implements VisionLabelExtractor {
         if (raw.isPresent()) {
             String val = raw.value();
             if (val.toLowerCase().contains("applied")) {
-                return FieldExtraction.of("Applied For", raw.confidence(), raw.evidence());
+                return FieldExtraction.of("Applied For", raw.confidence(), raw.evidence(), raw.boundingBox());
             }
             String clean = val.replaceAll("[^0-9]", "");
             if (clean.length() == 14) {
-                return FieldExtraction.of(clean, raw.confidence(), raw.evidence());
+                return FieldExtraction.of(clean, raw.confidence(), raw.evidence(), raw.boundingBox());
             }
             if (clean.length() >= 10 && clean.length() <= 16) {
-                return FieldExtraction.of(clean, Math.min(0.75, raw.safeConfidence()), raw.evidence());
+                return FieldExtraction.of(clean, Math.min(0.75, raw.safeConfidence()), raw.evidence(), raw.boundingBox());
             }
             return raw;
         }
@@ -823,7 +857,7 @@ public class GeminiVisionLabelExtractor implements VisionLabelExtractor {
         }
         String val = raw.value().trim();
         if (val.contains("@") && val.contains(".")) {
-            return FieldExtraction.of(val, raw.confidence(), raw.evidence());
+            return FieldExtraction.of(val, raw.confidence(), raw.evidence(), raw.boundingBox());
         }
         return FieldExtraction.empty();
     }

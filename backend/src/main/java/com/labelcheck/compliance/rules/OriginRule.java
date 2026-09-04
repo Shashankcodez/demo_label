@@ -20,6 +20,11 @@ public class OriginRule implements ComplianceRule {
     private static final String TITLE = "Country of Origin Declaration";
 
     @Override
+    public String getRuleId() {
+        return RULE_ID;
+    }
+
+    @Override
     public ComplianceCheck evaluate(StructuredLabelData labelData) {
         String origin = labelData.countryOfOrigin();
         String importer = labelData.importerName();
