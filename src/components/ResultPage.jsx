@@ -24,7 +24,13 @@ import {
   ChevronUp
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { formatLanguageDisplay, formatStatusDisplay, formatQualityTier } from '../api/scanMapper';
+import { 
+  formatLanguageDisplay, 
+  formatStatusDisplay, 
+  formatQualityTier,
+  formatExtractionStatus,
+  formatExtractionSource
+} from '../api/scanMapper';
 
 export default function ResultPage({ 
   product, 
@@ -33,6 +39,7 @@ export default function ResultPage({
 }) {
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'issues', 'passed'
   const [showStatutoryAudit, setShowStatutoryAudit] = useState(false);
+  const [showRawOcr, setShowRawOcr] = useState(false);
 
   useEffect(() => {
     // Fire celebratory confetti only if score is 90+ and overall status is PASS
@@ -76,6 +83,37 @@ export default function ResultPage({
     return [...list].sort((a, b) => (priority[a.status] || 99) - (priority[b.status] || 99));
   }, [product, activeTab]);
 
+  // Clean customer care values
+  const carePhone = product?.customerCare?.phone 
+    ? (product.customerCare.phone.startsWith('Phone:') ? product.customerCare.phone : `Phone: ${product.customerCare.phone}`)
+    : null;
+  const careEmail = product?.customerCare?.email
+    ? (product.customerCare.email.startsWith('Email:') ? product.customerCare.email : `Email: ${product.customerCare.email}`)
+    : null;
+
+  // 12 Mandatory Statutory Packaging Declarations Audit
+  const statutoryFields = useMemo(() => {
+    if (!product) return [];
+    if (Array.isArray(product.statutoryFields) && product.statutoryFields.length > 0) {
+      return product.statutoryFields;
+    }
+    const isPresent = (val) => Boolean(val && val !== 'Not detected' && val !== 'null' && String(val).trim().length > 0 && val !== 'Unreadable / Missing' && val !== 'Not Declared' && val !== 'Not specified' && val !== 'Not provided');
+    return [
+      { key: 'productName', name: 'Product Name / Identity', value: product.name, detected: isPresent(product.name), rule: 'Rule 6(1)(l)' },
+      { key: 'brand', name: 'Brand Name', value: product.brand, detected: isPresent(product.brand), rule: 'Rule 6(1)(l)' },
+      { key: 'netQuantity', name: 'Net Quantity (Metric)', value: product.netQuantity, detected: isPresent(product.netQuantity), rule: 'Rule 6(1)(c)' },
+      { key: 'mrp', name: 'Maximum Retail Price (MRP)', value: product.mrp, detected: isPresent(product.mrp), rule: 'Rule 6(1)(e)' },
+      { key: 'unitSalePrice', name: 'Unit Sale Price (USP)', value: product.unitSalePrice, detected: isPresent(product.unitSalePrice), rule: 'Rule 6(1)(e) Amend.' },
+      { key: 'manufacturer', name: 'Manufacturer / Packer Name', value: product.manufacturer, detected: isPresent(product.manufacturer), rule: 'Rule 6(1)(a)' },
+      { key: 'address', name: 'Manufacturer Address', value: product.manufacturerAddress, detected: isPresent(product.manufacturerAddress), rule: 'Rule 6(1)(a)' },
+      { key: 'countryOfOrigin', name: 'Country of Origin', value: product.countryOfOrigin, detected: isPresent(product.countryOfOrigin), rule: 'Rule 6(10)' },
+      { key: 'mfgDate', name: 'Date of Packing / Mfg (MFD)', value: product.mfgDate, detected: isPresent(product.mfgDate), rule: 'Rule 6(1)(d)' },
+      { key: 'expiryDate', name: 'Best Before / Expiry Date', value: product.expiryDate, detected: isPresent(product.expiryDate), rule: 'Rule 6(1)(d) / FSSAI' },
+      { key: 'fssaiLicense', name: 'FSSAI License / Status', value: product.fssaiLicense, detected: (isPresent(product.fssaiLicense) && product.fssaiLicense !== 'Not detected') || product.fssaiStatus === 'APPLIED_FOR', rule: 'FSSAI Sec 23' },
+      { key: 'customerCare', name: 'Consumer Care Helpline', value: carePhone || careEmail, detected: isPresent(carePhone) || isPresent(careEmail) || isPresent(product.customerCare?.address), rule: 'Rule 6(1)(n)' }
+    ];
+  }, [product, carePhone, careEmail]);
+
   if (!product) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16 text-center">
@@ -96,36 +134,6 @@ export default function ResultPage({
       </div>
     );
   }
-
-  // Clean customer care values
-  const carePhone = product.customerCare?.phone 
-    ? (product.customerCare.phone.startsWith('Phone:') ? product.customerCare.phone : `Phone: ${product.customerCare.phone}`)
-    : null;
-  const careEmail = product.customerCare?.email
-    ? (product.customerCare.email.startsWith('Email:') ? product.customerCare.email : `Email: ${product.customerCare.email}`)
-    : null;
-
-  // 12 Mandatory Statutory Packaging Declarations Audit
-  const statutoryFields = useMemo(() => {
-    if (Array.isArray(product.statutoryFields) && product.statutoryFields.length > 0) {
-      return product.statutoryFields;
-    }
-    const isPresent = (val) => Boolean(val && val !== 'Not detected' && val !== 'null' && String(val).trim().length > 0 && val !== 'Unreadable / Missing' && val !== 'Not Declared' && val !== 'Not specified' && val !== 'Not provided');
-    return [
-      { key: 'productName', name: 'Product Name / Identity', value: product.name, detected: isPresent(product.name), rule: 'Rule 6(1)(l)' },
-      { key: 'brand', name: 'Brand Name', value: product.brand, detected: isPresent(product.brand), rule: 'Rule 6(1)(l)' },
-      { key: 'netQuantity', name: 'Net Quantity (Metric)', value: product.netQuantity, detected: isPresent(product.netQuantity), rule: 'Rule 6(1)(c)' },
-      { key: 'mrp', name: 'Maximum Retail Price (MRP)', value: product.mrp, detected: isPresent(product.mrp), rule: 'Rule 6(1)(e)' },
-      { key: 'unitSalePrice', name: 'Unit Sale Price (USP)', value: product.unitSalePrice, detected: isPresent(product.unitSalePrice), rule: 'Rule 6(1)(e) Amend.' },
-      { key: 'manufacturer', name: 'Manufacturer / Packer Name', value: product.manufacturer, detected: isPresent(product.manufacturer), rule: 'Rule 6(1)(a)' },
-      { key: 'address', name: 'Manufacturer Address', value: product.manufacturerAddress, detected: isPresent(product.manufacturerAddress), rule: 'Rule 6(1)(a)' },
-      { key: 'countryOfOrigin', name: 'Country of Origin', value: product.countryOfOrigin, detected: isPresent(product.countryOfOrigin), rule: 'Rule 6(10)' },
-      { key: 'mfgDate', name: 'Date of Packing / Mfg (MFD)', value: product.mfgDate, detected: isPresent(product.mfgDate), rule: 'Rule 6(1)(d)' },
-      { key: 'expiryDate', name: 'Best Before / Expiry Date', value: product.expiryDate, detected: isPresent(product.expiryDate), rule: 'Rule 6(1)(d) / FSSAI' },
-      { key: 'fssaiLicense', name: 'FSSAI License / Status', value: product.fssaiLicense, detected: (isPresent(product.fssaiLicense) && product.fssaiLicense !== 'Not detected') || product.fssaiStatus === 'APPLIED_FOR', rule: 'FSSAI Sec 23' },
-      { key: 'customerCare', name: 'Consumer Care Helpline', value: carePhone || careEmail, detected: isPresent(carePhone) || isPresent(careEmail) || isPresent(product.customerCare?.address), rule: 'Rule 6(1)(n)' }
-    ];
-  }, [product, carePhone, careEmail]);
 
   const detectedCount = typeof product.detectedFieldsCount === 'number' 
     ? product.detectedFieldsCount 
@@ -260,6 +268,33 @@ export default function ResultPage({
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 pb-24 md:pb-12">
       
+      {/* AI Pre-Compliance Banner */}
+      <div className="mb-5 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white rounded-2xl p-4 sm:p-5 shadow-card border border-slate-700/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center shrink-0">
+            <Scan className="w-5 h-5 text-indigo-300" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <h2 className="text-sm font-bold text-white tracking-wide">AI-Assisted Label Analysis</h2>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+              Automated statutory pre-compliance screening — verify declarations against original packaging.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto justify-end">
+          <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-white/10 text-slate-200 border border-white/10 backdrop-blur-sm">
+            {formatExtractionSource(product.extractionSource, product.aiModel)}
+          </span>
+          <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            {Math.round((product.overallExtractionConfidence || 0.85) * 100)}% Extraction Conf.
+          </span>
+        </div>
+      </div>
+
       {/* Top Action Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
         <button
@@ -300,6 +335,9 @@ export default function ResultPage({
                   'bg-orange-100 text-orange-800 border-orange-300'
                 }`}>
                   {formatQualityTier(qualityTier)}
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                  {formatExtractionStatus(product.extractionStatus)}
                 </span>
                 <span className="text-xs font-bold text-slate-800">
                   {detectedCount} of 12 Statutory Declarations Detected
@@ -381,9 +419,19 @@ export default function ResultPage({
                       {field.detected ? (
                         <span className="text-emerald-800 font-semibold">{String(field.value || 'Detected')}</span>
                       ) : (
-                        <span className="text-amber-800 italic">Not detected in scan</span>
+                        <span className="text-amber-800 italic">Not detected in image</span>
                       )}
                     </div>
+                    {field.evidence && (
+                      <div className="text-[10px] text-slate-500 mt-1 truncate italic bg-white/70 px-1.5 py-0.5 rounded border border-slate-200/50" title={field.evidence}>
+                        👁️ Evidence: {field.evidence}
+                      </div>
+                    )}
+                    {field.confidence != null && (
+                      <div className="text-[10px] font-semibold text-emerald-700 mt-0.5">
+                        {Math.round(field.confidence * 100)}% confidence
+                      </div>
+                    )}
                   </div>
                   <div className="shrink-0 mt-1">
                     {field.detected ? (
@@ -841,7 +889,53 @@ export default function ResultPage({
         </div>
       </div>
 
-      {/* 5. Physical Verification & Limitations Disclaimer Card */}
+      {/* 5. Raw OCR Inspection Accordion */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-card p-4 sm:p-5 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 shrink-0">
+              <FileText className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-2">
+                <span>{product.extractionSource === 'TESSERACT_FALLBACK' ? 'Local OCR Extraction Stream (Fallback Mode)' : 'Inspect Raw OCR & Debug Evidence'}</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                  {formatLanguageDisplay(product.ocrLanguage || 'eng')}
+                </span>
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                {product.rawOcrText ? `${product.rawOcrText.length} characters recognized from label image` : 'No raw text stream available'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowRawOcr(!showRawOcr)}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 flex items-center gap-1.5 self-start sm:self-auto transition-colors"
+          >
+            <span>{showRawOcr ? 'Hide Raw OCR' : 'Inspect Raw OCR'}</span>
+            {showRawOcr ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+
+        {showRawOcr && (
+          <div className="mt-4 pt-4 border-t border-slate-200 animate-fadeIn">
+            {product.extractionSource === 'TESSERACT_FALLBACK' && (
+              <div className="mb-3 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Notice: Vision AI layer was unavailable; results reflect local deterministic OCR extraction heuristics.</span>
+              </div>
+            )}
+            <div className="bg-slate-950 text-emerald-400 p-4 rounded-xl font-mono text-xs overflow-x-auto max-h-72 leading-relaxed border border-slate-800 shadow-inner">
+              <pre className="whitespace-pre-wrap selection:bg-emerald-900 selection:text-white">
+                {product.rawOcrText || '(No text extracted by OCR)'}
+              </pre>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 6. Physical Verification & Limitations Disclaimer Card */}
       <div className="bg-slate-50 rounded-2xl border border-slate-200/90 p-5 sm:p-6 mb-8 text-xs text-slate-600 space-y-3">
         <div className="flex items-center gap-2 font-bold text-slate-800 text-sm">
           <HelpCircle className="w-4 h-4 text-gov-blue shrink-0" />

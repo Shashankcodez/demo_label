@@ -228,14 +228,6 @@ public class LabelExtractionService {
      * Normalizes uppercase titles like "APPLE SLICE" to "Apple Slice".
      */
     public String extractProductName(List<String> lines, List<OcrWord> words) {
-        // Priority pass: explicit food commodity title matches
-        for (String line : lines) {
-            String clean = line.replaceAll("[,;:\"'“”’\\-\\.]+$", "").trim();
-            if (clean.equalsIgnoreCase("apple slice") || clean.toLowerCase().contains("apple slice")) {
-                return "Apple Slice";
-            }
-        }
-
         // Stopwords / packaging noise to exclude from product name
         Pattern stopwordPattern = Pattern.compile(
                 "(?i)\\b(ready\\s*to\\s*cook|online\\s*grocery|coocking|fruits?|vegetables?|best\\s*prices|available\\s*online|marketed\\s*by|packed\\s*by|manufactured\\s*by|nutrition|calories|fat|batch|weight|store|estore|pure|100%|clean|fresh|full\\s*c|vitamin)\\b"
@@ -678,13 +670,16 @@ public class LabelExtractionService {
     public String extractAddress(List<String> lines) {
         for (int i = 0; i < lines.size(); i++) {
             String line = lines.get(i);
-            if (MANUFACTURER_PATTERN.matcher(line).find() || line.toLowerCase().startsWith("d market")) {
+            if (MANUFACTURER_PATTERN.matcher(line).find()) {
                 // Collect subsequent address lines
                 List<String> addrParts = new ArrayList<>();
                 int startOffset = 1;
-                // If manufacturer was on line i + 1, address starts on line i + 2
-                if (i + 1 < lines.size() && lines.get(i + 1).toLowerCase().contains("d market")) {
-                    startOffset = 2;
+                // If manufacturer name is on line i + 1, address starts on line i + 2
+                if (i + 1 < lines.size()) {
+                    String nextL = lines.get(i + 1).trim();
+                    if (nextL.length() <= 30 && !nextL.toLowerCase().matches(".*\\b(road|marg|street|near|building|villa|floor|virar|mumbai|dist|district|pin|state)\\b.*")) {
+                        startOffset = 2;
+                    }
                 }
 
                 for (int j = i + startOffset; j < lines.size(); j++) {
@@ -777,17 +772,19 @@ public class LabelExtractionService {
     }
 
     public String extractBrand(List<String> lines, String manufacturer, String productName) {
-        for (String line : lines) {
-            if (line.toLowerCase().contains("smart online store")) {
-                return "Smart Online Store";
-            }
-        }
-        for (String line : lines) {
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
             if (line.toLowerCase().contains("marketed by")) {
                 String after = line.substring(line.toLowerCase().indexOf("marketed by") + "marketed by".length())
                         .replaceAll("[:\\-]+", "").trim();
                 if (!after.isEmpty() && after.length() >= 3 && after.length() <= 30 && after.matches(".*[A-Za-z]{3,}.*") && !after.matches("^(.)\\1+$")) {
                     return after;
+                }
+                if (i + 1 < lines.size()) {
+                    String nextL = lines.get(i + 1).replaceAll("[:\\-]+", "").trim();
+                    if (!nextL.isEmpty() && nextL.length() >= 3 && nextL.length() <= 35 && nextL.matches(".*[A-Za-z]{3,}.*") && !nextL.matches("^(.)\\1+$")) {
+                        return nextL;
+                    }
                 }
             }
         }

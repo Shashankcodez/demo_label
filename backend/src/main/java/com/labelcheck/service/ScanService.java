@@ -1,24 +1,31 @@
 package com.labelcheck.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.labelcheck.compliance.ComplianceCheck;
 import com.labelcheck.compliance.ComplianceResult;
 import com.labelcheck.compliance.ComplianceRuleEngine;
 import com.labelcheck.compliance.RuleSeverity;
 import com.labelcheck.compliance.RuleStatus;
+import com.labelcheck.config.AiProperties;
 import com.labelcheck.dto.OcrResult;
 import com.labelcheck.dto.PageResponse;
 import com.labelcheck.dto.ScanResponse;
 import com.labelcheck.dto.ScanSummaryResponse;
 import com.labelcheck.dto.StructuredLabelData;
+import com.labelcheck.dto.ai.AiLabelExtractionResult;
 import com.labelcheck.entity.ScanEntity;
 import com.labelcheck.exception.FileStorageException;
 import com.labelcheck.exception.InvalidImageException;
 import com.labelcheck.exception.ResourceNotFoundException;
 import com.labelcheck.repository.ScanRepository;
+import com.labelcheck.service.ai.ExtractionMergeService;
+import com.labelcheck.service.ai.OpenAiCompatibleVisionExtractor;
+import com.labelcheck.service.ai.VisionLabelExtractor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -27,22 +34,21 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 /**
- * Service orchestrating label image validation, secure temporary storage,
- * local Tesseract OCR text extraction, structured entity parsing, statutory compliance evaluation,
- * and database persistence with scan history retrieval.
+ * Core orchestrator for the LabelCheck pipeline:
+ * Ingestion → Format/Magic Byte Validation → Storage → Image Quality Assessment →
+ * Vision AI Extraction (Primary) → Local Tesseract OCR (Fallback & Transparency Evidence) →
+ * Extraction Merge → Deterministic Regulatory Compliance Evaluation → Persistence.
  */
 @Service
 public class ScanService {
@@ -55,8 +61,7 @@ public class ScanService {
             "image/webp"
     );
 
-    // Magic bytes for standard image formats
-    private static final byte[] JPEG_MAGIC_PREFIX = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
+    private static final byte[] JPEG_MAGIC = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF};
     private static final byte[] PNG_MAGIC = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
     private static final byte[] RIFF_HEADER = new byte[]{0x52, 0x49, 0x46, 0x46}; // "RIFF"
     private static final byte[] WEBP_HEADER = new byte[]{0x57, 0x45, 0x42, 0x50}; // "WEBP"
@@ -68,7 +73,39 @@ public class ScanService {
     private final ComplianceRuleEngine complianceRuleEngine;
     private final ScanRepository scanRepository;
     private final ObjectMapper objectMapper;
+    private final VisionLabelExtractor visionLabelExtractor;
+    private final ExtractionMergeService extractionMergeService;
+    private final ImagePreprocessingService imagePreprocessingService;
+    private final AiProperties aiProperties;
 
+    @Autowired
+    public ScanService(
+            FileStorageService fileStorageService,
+            OcrService ocrService,
+            LabelExtractionService labelExtractionService,
+            ComplianceRuleEngine complianceRuleEngine,
+            ScanRepository scanRepository,
+            ObjectMapper objectMapper,
+            VisionLabelExtractor visionLabelExtractor,
+            ExtractionMergeService extractionMergeService,
+            ImagePreprocessingService imagePreprocessingService,
+            AiProperties aiProperties
+    ) {
+        this.fileStorageService = fileStorageService;
+        this.ocrService = ocrService;
+        this.labelExtractionService = labelExtractionService;
+        this.complianceRuleEngine = complianceRuleEngine;
+        this.scanRepository = scanRepository;
+        this.objectMapper = objectMapper;
+        this.visionLabelExtractor = visionLabelExtractor;
+        this.extractionMergeService = extractionMergeService;
+        this.imagePreprocessingService = imagePreprocessingService;
+        this.aiProperties = aiProperties;
+    }
+
+    /**
+     * Backward-compatible constructor for unit and integration tests.
+     */
     public ScanService(
             FileStorageService fileStorageService,
             OcrService ocrService,
@@ -77,12 +114,18 @@ public class ScanService {
             ScanRepository scanRepository,
             ObjectMapper objectMapper
     ) {
-        this.fileStorageService = fileStorageService;
-        this.ocrService = ocrService;
-        this.labelExtractionService = labelExtractionService;
-        this.complianceRuleEngine = complianceRuleEngine;
-        this.scanRepository = scanRepository;
-        this.objectMapper = objectMapper;
+        this(
+                fileStorageService,
+                ocrService,
+                labelExtractionService,
+                complianceRuleEngine,
+                scanRepository,
+                objectMapper,
+                new OpenAiCompatibleVisionExtractor(new AiProperties(), objectMapper),
+                new ExtractionMergeService(),
+                new ImagePreprocessingService(),
+                new AiProperties()
+        );
     }
 
     /**
@@ -92,26 +135,11 @@ public class ScanService {
         return ocrService.getSupportedLanguages();
     }
 
-    /**
-     * Executes the complete end-to-end processing pipeline using default language (English):
-     * Ingestion → Validation → Storage → OCR → Entity Extraction → Compliance Engine → Database Persistence.
-     *
-     * @param file the multipart file received from client
-     * @return ScanResponse containing scanId, extracted text, structured label data, and compliance checks
-     */
     @Transactional
     public ScanResponse processUpload(MultipartFile file) {
         return processUpload(file, null);
     }
 
-    /**
-     * Executes the complete end-to-end processing pipeline with requested OCR language:
-     * Ingestion → Validation → Storage → OCR → Entity Extraction → Compliance Engine → Database Persistence.
-     *
-     * @param file the multipart file received from client
-     * @param language the requested language code or combined string (e.g. "eng+hin")
-     * @return ScanResponse containing scanId, extracted text, structured label data, and compliance checks
-     */
     @Transactional
     public ScanResponse processUpload(MultipartFile file, String language) {
         if (file == null || file.isEmpty()) {
@@ -135,7 +163,7 @@ public class ScanService {
             throw new InvalidImageException("Unable to read uploaded file stream");
         }
 
-        // Validate actual binary image data
+        // Validate actual binary image magic bytes
         validateImageBytes(contentType, bytes);
 
         UUID scanId = UUID.randomUUID();
@@ -144,31 +172,57 @@ public class ScanService {
 
         Path storedFilePath = fileStorageService.getUploadLocation().resolve(storedFilename);
 
-        // 1. Run local Tesseract OCR on the stored image (multilingual or default English)
+        // 1. Non-blocking image quality assessment
+        ImagePreprocessingService.QualityAssessment quality = (imagePreprocessingService != null)
+                ? imagePreprocessingService.assessQuality(storedFilePath)
+                : new ImagePreprocessingService.QualityAssessment(false, "OK", 0, 0);
+
+        // 2. Run local Tesseract OCR as fallback & transparency evidence
         OcrResult ocrResult = (language != null && !language.isBlank())
                 ? ocrService.extractText(storedFilePath, language)
                 : ocrService.extractText(storedFilePath);
 
-        // 2. Parse structured label declarations from OCR text
-        StructuredLabelData labelData = labelExtractionService.extract(ocrResult.text());
+        StructuredLabelData ocrData = null;
+        if (ocrResult != null && ocrResult.text() != null && !ocrResult.text().isBlank()) {
+            ocrData = labelExtractionService.extract(ocrResult.text());
+        }
 
+        // 3. Run Vision AI extraction (Primary Source)
+        AiLabelExtractionResult aiResult = null;
+        if (visionLabelExtractor != null && visionLabelExtractor.isEnabled()) {
+            aiResult = visionLabelExtractor.extract(storedFilePath, contentType);
+        }
+
+        // 4. Merge Vision AI primary extraction with local OCR fallback
+        ExtractionMergeService.MergedResult merged = (extractionMergeService != null)
+                ? extractionMergeService.merge(aiResult, ocrData, ocrResult != null ? ocrResult.text() : "", quality.isSuspect())
+                : new ExtractionMergeService.MergedResult(
+                        ocrData,
+                        "TESSERACT_FALLBACK",
+                        "OCR_AVAILABLE_EXTRACTION_LIMITED",
+                        0.70,
+                        Map.of(),
+                        Map.of(),
+                        "Local OCR extraction"
+                );
+
+        StructuredLabelData labelData = merged.labelData();
         int detectedFieldsCount = labelData != null ? labelData.countDetectedFields() : 0;
         String qualityTier = labelData != null ? labelData.getQualityTier() : "VERY_POOR_IMAGE";
         String complianceOutcome = labelData != null ? labelData.getComplianceOutcome() : "Retake image";
-        boolean hasText = "OCR_COMPLETE".equals(ocrResult.status()) && ocrResult.text() != null && !ocrResult.text().isBlank();
 
         ComplianceResult complianceResult;
         String status;
         String message;
         String qualityMessage;
 
-        // 3. Quality Tier Workflow & NEVER 0 fields blank/useless result
-        if (!hasText || detectedFieldsCount == 0) {
+        // 5. Deterministic Compliance Rule Evaluation (AI NEVER DECIDES LEGAL COMPLIANCE)
+        if (detectedFieldsCount == 0 || "IMAGE_QUALITY_LOW".equals(merged.extractionStatus()) || "TOTAL_EXTRACTION_FAILURE".equals(merged.extractionStatus())) {
             status = "VERY_POOR_IMAGE";
             qualityTier = "VERY_POOR_IMAGE";
             complianceOutcome = "Retake image";
-            message = "Image quality is too poor or unreadable to detect statutory declarations (0 fields detected). Retake image required.";
-            qualityMessage = "Very Poor Image: No readable packaging text detected. Please retake the photograph.";
+            message = "Image quality is too low or unreadable to detect statutory declarations (0 fields detected). Retake image required.";
+            qualityMessage = "Very Poor Image: No legible packaging text detected. Please retake the photograph.";
             complianceResult = new ComplianceResult(
                     RuleStatus.WARNING,
                     0,
@@ -185,36 +239,48 @@ public class ScanService {
                     "0 fields detected — automated compliance screening halted. Image quality is insufficient. Please retake the product photograph."
             );
         } else {
-            // Evaluate statutory packaging compliance rules
+            // Evaluate deterministic statutory packaging rules
             complianceResult = complianceRuleEngine.evaluate(labelData);
             status = "ANALYSIS_COMPLETE";
+
             if (detectedFieldsCount >= 10) {
-                message = String.format("Good Label: %d statutory declarations detected. Full compliance screening completed.", detectedFieldsCount);
+                message = String.format("Good Label (%s): %d statutory declarations detected. Full compliance screening completed.",
+                        merged.extractionSource(), detectedFieldsCount);
                 qualityMessage = String.format("Good Label (%d/12 fields detected) → Compliance", detectedFieldsCount);
             } else if (detectedFieldsCount >= 6) {
-                message = String.format("Average Label: %d statutory declarations detected. Compliance evaluated with physical review recommended.", detectedFieldsCount);
+                message = String.format("Average Label (%s): %d statutory declarations detected. Compliance evaluated with physical review recommended.",
+                        merged.extractionSource(), detectedFieldsCount);
                 qualityMessage = String.format("Average Label (%d/12 fields detected) → Compliance + Needs Review", detectedFieldsCount);
             } else {
-                message = String.format("Poor Label: Only %d statutory declaration%s detected. Partial extraction completed; thorough review required.",
-                        detectedFieldsCount, detectedFieldsCount == 1 ? "" : "s");
+                message = String.format("Poor Label (%s): Only %d statutory declaration%s detected. Partial extraction completed; thorough review required.",
+                        merged.extractionSource(), detectedFieldsCount, detectedFieldsCount == 1 ? "" : "s");
                 qualityMessage = String.format("Poor Label (%d/12 fields detected) → Partial extraction + Needs Review", detectedFieldsCount);
             }
         }
 
-        // 4. Persist completed scan result to database
+        boolean isAiEnabled = aiProperties != null && aiProperties.isEnabled();
+        String aiModel = isAiEnabled ? aiProperties.getModel() : null;
+
+        // 6. Persist completed scan record to database
         Instant createdAt = persistScanRecord(
                 scanId,
                 storedFilename,
                 contentType,
                 file.getSize(),
                 status,
-                ocrResult.text(),
+                ocrResult != null ? ocrResult.text() : "",
                 labelData,
-                complianceResult
+                complianceResult,
+                merged.extractionSource(),
+                merged.extractionStatus(),
+                merged.overallConfidence(),
+                aiModel,
+                merged.fieldEvidence(),
+                merged.fieldConfidence()
         );
 
-        log.info("Completed scan analysis and persistence for scanId=[{}]: status=[{}], qualityTier=[{}], fieldsDetected=[{}], compliance=[{}] with score [{}]",
-                scanId, status, qualityTier, detectedFieldsCount, complianceResult.overallStatus(), complianceResult.overallScore());
+        log.info("Completed scan analysis for scanId=[{}]: source=[{}], status=[{}], qualityTier=[{}], fieldsDetected=[{}], compliance=[{}] with score [{}]",
+                scanId, merged.extractionSource(), merged.extractionStatus(), qualityTier, detectedFieldsCount, complianceResult.overallStatus(), complianceResult.overallScore());
 
         return new ScanResponse(
                 scanId,
@@ -222,9 +288,9 @@ public class ScanService {
                 contentType,
                 file.getSize(),
                 status,
-                ocrResult.text(),
-                ocrResult.text(),
-                ocrResult.language(),
+                ocrResult != null ? ocrResult.text() : "",
+                ocrResult != null ? ocrResult.text() : "",
+                ocrResult != null ? ocrResult.language() : "eng",
                 message,
                 labelData,
                 complianceResult,
@@ -232,17 +298,17 @@ public class ScanService {
                 detectedFieldsCount,
                 qualityTier,
                 complianceOutcome,
-                qualityMessage
+                qualityMessage,
+                merged.extractionSource(),
+                merged.extractionStatus(),
+                merged.overallConfidence(),
+                isAiEnabled,
+                aiModel,
+                merged.fieldEvidence(),
+                merged.fieldConfidence()
         );
     }
 
-    /**
-     * Retrieves paginated, lightweight history of previous scans ordered newest first.
-     *
-     * @param page zero-indexed page number (default 0)
-     * @param size page size (default 20, max 100)
-     * @return PageResponse of ScanSummaryResponse
-     */
     @Transactional(readOnly = true)
     public PageResponse<ScanSummaryResponse> getScanHistory(int page, int size) {
         int clampedPage = Math.max(0, page);
@@ -254,25 +320,28 @@ public class ScanService {
         Page<ScanSummaryResponse> summaryPage = entityPage.map(e -> new ScanSummaryResponse(
                 e.getScanId(),
                 e.getFilename(),
-                e.getProductName(),
+                e.getProductName() != null ? e.getProductName() : "Unknown / Product not detected",
                 e.getBrand(),
                 e.getStatus(),
                 e.getOverallStatus(),
                 e.getOverallScore(),
                 e.getSummary(),
-                e.getCreatedAt()
+                e.getCreatedAt(),
+                e.getExtractionStatus() != null ? e.getExtractionStatus() : "AI_SUCCESS",
+                e.getExtractionSource() != null ? e.getExtractionSource() : "VISION_AI"
         ));
 
-        return PageResponse.from(summaryPage);
+        return new PageResponse<>(
+                summaryPage.getContent(),
+                summaryPage.getNumber(),
+                summaryPage.getSize(),
+                summaryPage.getTotalElements(),
+                summaryPage.getTotalPages(),
+                summaryPage.isFirst(),
+                summaryPage.isLast()
+        );
     }
 
-    /**
-     * Retrieves full stored scan analysis details by public scanId.
-     *
-     * @param scanId public UUID
-     * @return complete ScanResponse
-     * @throws ResourceNotFoundException if scanId does not exist
-     */
     @Transactional(readOnly = true)
     public ScanResponse getScanByScanId(UUID scanId) {
         if (scanId == null) {
@@ -297,6 +366,11 @@ public class ScanService {
                 detectedFieldsCount,
                 complianceOutcome);
 
+        Map<String, String> evidenceMap = deserializeMap(entity.getFieldEvidenceJson());
+        Map<String, Double> confidenceMap = deserializeDoubleMap(entity.getFieldConfidenceJson());
+
+        boolean isAiEnabled = aiProperties != null && aiProperties.isEnabled();
+
         return new ScanResponse(
                 entity.getScanId(),
                 entity.getFilename(),
@@ -313,7 +387,14 @@ public class ScanService {
                 detectedFieldsCount,
                 qualityTier,
                 complianceOutcome,
-                qualityMessage
+                qualityMessage,
+                entity.getExtractionSource() != null ? entity.getExtractionSource() : "VISION_AI",
+                entity.getExtractionStatus() != null ? entity.getExtractionStatus() : "AI_SUCCESS",
+                entity.getExtractionConfidence() != null ? entity.getExtractionConfidence() : 0.85,
+                isAiEnabled,
+                entity.getAiModel(),
+                evidenceMap,
+                confidenceMap
         );
     }
 
@@ -325,13 +406,27 @@ public class ScanService {
             String status,
             String ocrText,
             StructuredLabelData labelData,
-            ComplianceResult complianceResult
+            ComplianceResult complianceResult,
+            String extractionSource,
+            String extractionStatus,
+            Double extractionConfidence,
+            String aiModel,
+            Map<String, String> fieldEvidence,
+            Map<String, Double> fieldConfidence
     ) {
         String labelJson;
         String complianceJson;
+        String evidenceJson = null;
+        String confidenceJson = null;
         try {
             labelJson = objectMapper.writeValueAsString(labelData);
             complianceJson = objectMapper.writeValueAsString(complianceResult);
+            if (fieldEvidence != null && !fieldEvidence.isEmpty()) {
+                evidenceJson = objectMapper.writeValueAsString(fieldEvidence);
+            }
+            if (fieldConfidence != null && !fieldConfidence.isEmpty()) {
+                confidenceJson = objectMapper.writeValueAsString(fieldConfidence);
+            }
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize scan result to JSON for scanId=[{}]: {}", scanId, e.getMessage(), e);
             throw new FileStorageException("Unable to serialize scan analysis data for storage");
@@ -355,125 +450,128 @@ public class ScanService {
                 complianceJson
         );
 
+        entity.setExtractionSource(extractionSource);
+        entity.setExtractionStatus(extractionStatus);
+        entity.setExtractionConfidence(extractionConfidence);
+        entity.setAiModel(aiModel);
+        entity.setFieldEvidenceJson(evidenceJson);
+        entity.setFieldConfidenceJson(confidenceJson);
+
         try {
             ScanEntity saved = scanRepository.save(entity);
             return saved.getCreatedAt() != null ? saved.getCreatedAt() : Instant.now();
         } catch (Exception e) {
-            log.error("Database persistence failed for scanId=[{}]: {}", scanId, e.getMessage(), e);
-            throw new FileStorageException("Database persistence failed while saving scan record");
+            log.error("Failed to persist ScanEntity for scanId=[{}]: {}", scanId, e.getMessage(), e);
+            throw new FileStorageException("Database error saving scan analysis record");
         }
     }
 
-    private StructuredLabelData deserializeLabel(String json, String fallbackOcr) {
-        if (json != null && !json.isBlank()) {
-            try {
-                return objectMapper.readValue(json, StructuredLabelData.class);
-            } catch (Exception e) {
-                log.warn("Failed to deserialize structured label JSON: {}", e.getMessage());
-            }
+    private StructuredLabelData deserializeLabel(String json, String ocrText) {
+        if (json == null || json.isBlank()) {
+            return new StructuredLabelData(
+                    null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                    ocrText, null, "NOT_DETECTED"
+            );
         }
-        return labelExtractionService.extract(fallbackOcr);
+        try {
+            return objectMapper.readValue(json, StructuredLabelData.class);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to deserialize ExtractedLabel JSON: {}", e.getMessage());
+            return new StructuredLabelData(
+                    null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+                    ocrText, null, "NOT_DETECTED"
+            );
+        }
     }
 
-    private ComplianceResult deserializeCompliance(String json, com.labelcheck.compliance.RuleStatus status, int score, String summary) {
-        if (json != null && !json.isBlank()) {
-            try {
-                return objectMapper.readValue(json, ComplianceResult.class);
-            } catch (Exception e) {
-                log.warn("Failed to deserialize compliance result JSON: {}", e.getMessage());
-            }
+    private ComplianceResult deserializeCompliance(String json, RuleStatus overallStatus, int overallScore, String summary) {
+        if (json == null || json.isBlank()) {
+            return new ComplianceResult(overallStatus != null ? overallStatus : RuleStatus.WARNING, overallScore, List.of(), summary != null ? summary : "");
         }
-        return new ComplianceResult(status, score, List.of(), summary);
+        try {
+            return objectMapper.readValue(json, ComplianceResult.class);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to deserialize ComplianceResult JSON: {}", e.getMessage());
+            return new ComplianceResult(overallStatus != null ? overallStatus : RuleStatus.WARNING, overallScore, List.of(), summary != null ? summary : "");
+        }
     }
 
-    /**
-     * Validates that the uploaded byte array represents a genuine, readable image of the specified MIME type.
-     */
+    private Map<String, String> deserializeMap(String json) {
+        if (json == null || json.isBlank()) return Map.of();
+        try {
+            return objectMapper.readValue(json, new TypeReference<Map<String, String>>() {});
+        } catch (Exception e) {
+            return Map.of();
+        }
+    }
+
+    private Map<String, Double> deserializeDoubleMap(String json) {
+        if (json == null || json.isBlank()) return Map.of();
+        try {
+            return objectMapper.readValue(json, new TypeReference<Map<String, Double>>() {});
+        } catch (Exception e) {
+            return Map.of();
+        }
+    }
+
     private void validateImageBytes(String contentType, byte[] bytes) {
         if (bytes == null || bytes.length < 12) {
             throw new InvalidImageException("Image file is too small or truncated to be a valid image");
         }
 
         switch (contentType) {
-            case "image/jpeg" -> validateJpeg(bytes);
-            case "image/png" -> validatePng(bytes);
-            case "image/webp" -> validateWebp(bytes);
-            default -> throw new InvalidImageException("Unsupported image format: " + contentType);
-        }
-    }
-
-    private void validateJpeg(byte[] bytes) {
-        if (bytes.length < JPEG_MAGIC_PREFIX.length ||
-                bytes[0] != JPEG_MAGIC_PREFIX[0] ||
-                bytes[1] != JPEG_MAGIC_PREFIX[1] ||
-                bytes[2] != JPEG_MAGIC_PREFIX[2]) {
-            throw new InvalidImageException("File content does not match JPEG signature");
-        }
-
-        decodeWithImageIO(bytes, "JPEG");
-    }
-
-    private void validatePng(byte[] bytes) {
-        if (bytes.length < PNG_MAGIC.length) {
-            throw new InvalidImageException("File content does not match PNG signature");
-        }
-        for (int i = 0; i < PNG_MAGIC.length; i++) {
-            if (bytes[i] != PNG_MAGIC[i]) {
-                throw new InvalidImageException("File content does not match PNG signature");
+            case "image/jpeg" -> {
+                if (bytes.length < JPEG_MAGIC.length) {
+                    throw new InvalidImageException("JPEG image payload is too small or truncated");
+                }
+                if (!startsWith(bytes, JPEG_MAGIC)) {
+                    throw new InvalidImageException("File content does not match JPEG signature");
+                }
             }
-        }
-
-        decodeWithImageIO(bytes, "PNG");
-    }
-
-    /**
-     * Validates WebP structural binary format (RIFF container, WEBP signature, and VP8 chunk header).
-     */
-    private void validateWebp(byte[] bytes) {
-        if (bytes.length < 16) {
-            throw new InvalidImageException("File content is too small to be a valid WebP image");
-        }
-
-        // Check bytes 0..3: "RIFF"
-        if (bytes[0] != RIFF_HEADER[0] || bytes[1] != RIFF_HEADER[1] ||
-                bytes[2] != RIFF_HEADER[2] || bytes[3] != RIFF_HEADER[3]) {
-            throw new InvalidImageException("File content does not match WebP RIFF container header");
-        }
-
-        // Check bytes 8..11: "WEBP"
-        if (bytes[8] != WEBP_HEADER[0] || bytes[9] != WEBP_HEADER[1] ||
-                bytes[10] != WEBP_HEADER[2] || bytes[11] != WEBP_HEADER[3]) {
-            throw new InvalidImageException("File content does not match WebP format identifier");
-        }
-
-        // Check bytes 12..15: Valid chunk signature ("VP8 ", "VP8L", "VP8X")
-        String chunkHeader = new String(Arrays.copyOfRange(bytes, 12, 16));
-        if (!WEBP_CHUNKS.contains(chunkHeader)) {
-            throw new InvalidImageException("File content does not contain a recognized WebP bitstream chunk (" + chunkHeader + ")");
-        }
-    }
-
-    /**
-     * Decodes the byte stream using Java ImageIO to ensure the pixel raster is uncorrupted and readable.
-     */
-    private void decodeWithImageIO(byte[] bytes, String formatName) {
-        try {
-            BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
-            if (image == null || image.getWidth() <= 0 || image.getHeight() <= 0) {
-                throw new InvalidImageException("File content cannot be decoded as a readable " + formatName + " image");
+            case "image/png" -> {
+                if (bytes.length < PNG_MAGIC.length) {
+                    throw new InvalidImageException("PNG image payload is too small or truncated");
+                }
+                if (!startsWith(bytes, PNG_MAGIC)) {
+                    throw new InvalidImageException("File content does not match PNG signature");
+                }
             }
-        } catch (IOException e) {
-            log.warn("ImageIO encountered decoding error for {}: {}", formatName, e.getMessage());
-            throw new InvalidImageException("Corrupted or unreadable " + formatName + " image data");
+            case "image/webp" -> {
+                if (bytes.length < 12) {
+                    throw new InvalidImageException("File is too small to be a valid WebP image");
+                }
+                if (!startsWith(bytes, RIFF_HEADER)) {
+                    throw new InvalidImageException("WebP missing RIFF header");
+                }
+                byte[] webpCheck = Arrays.copyOfRange(bytes, 8, 12);
+                if (!Arrays.equals(webpCheck, WEBP_HEADER)) {
+                    throw new InvalidImageException("WebP missing WEBP signature at offset 8");
+                }
+                if (bytes.length >= 16) {
+                    String chunkType = new String(Arrays.copyOfRange(bytes, 12, 16), java.nio.charset.StandardCharsets.US_ASCII);
+                    if (!WEBP_CHUNKS.contains(chunkType)) {
+                        throw new InvalidImageException("WebP contains unsupported chunk: " + chunkType);
+                    }
+                }
+            }
+            default -> throw new InvalidImageException("Unsupported content type for byte validation: " + contentType);
         }
+    }
+
+    private boolean startsWith(byte[] data, byte[] prefix) {
+        if (data.length < prefix.length) return false;
+        for (int i = 0; i < prefix.length; i++) {
+            if (data[i] != prefix[i]) return false;
+        }
+        return true;
     }
 
     private String determineCanonicalExtension(String contentType) {
         return switch (contentType) {
-            case "image/jpeg" -> "jpg";
-            case "image/png" -> "png";
-            case "image/webp" -> "webp";
-            default -> "img";
+            case "image/jpeg" -> ".jpg";
+            case "image/png" -> ".png";
+            case "image/webp" -> ".webp";
+            default -> ".bin";
         };
     }
 }

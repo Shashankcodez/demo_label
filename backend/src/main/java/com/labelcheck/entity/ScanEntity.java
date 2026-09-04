@@ -81,6 +81,26 @@ public class ScanEntity {
     @Column(name = "compliance_result_json", columnDefinition = "CLOB")
     private String complianceResultJson;
 
+    @Column(name = "extraction_source", length = 32)
+    private String extractionSource;
+
+    @Column(name = "extraction_status", length = 48)
+    private String extractionStatus;
+
+    @Column(name = "extraction_confidence")
+    private Double extractionConfidence;
+
+    @Column(name = "ai_model", length = 64)
+    private String aiModel;
+
+    @Lob
+    @Column(name = "field_evidence_json", columnDefinition = "CLOB")
+    private String fieldEvidenceJson;
+
+    @Lob
+    @Column(name = "field_confidence_json", columnDefinition = "CLOB")
+    private String fieldConfidenceJson;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -258,5 +278,53 @@ public class ScanEntity {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getExtractionSource() {
+        return extractionSource;
+    }
+
+    public void setExtractionSource(String extractionSource) {
+        this.extractionSource = extractionSource;
+    }
+
+    public String getExtractionStatus() {
+        return extractionStatus;
+    }
+
+    public void setExtractionStatus(String extractionStatus) {
+        this.extractionStatus = extractionStatus;
+    }
+
+    public Double getExtractionConfidence() {
+        return extractionConfidence;
+    }
+
+    public void setExtractionConfidence(Double extractionConfidence) {
+        this.extractionConfidence = extractionConfidence;
+    }
+
+    public String getAiModel() {
+        return aiModel;
+    }
+
+    public void setAiModel(String aiModel) {
+        this.aiModel = aiModel;
+    }
+
+    public String getFieldEvidenceJson() {
+        return fieldEvidenceJson;
+    }
+
+    public void setFieldEvidenceJson(String fieldEvidenceJson) {
+        this.fieldEvidenceJson = fieldEvidenceJson;
+    }
+
+    public String getFieldConfidenceJson() {
+        return fieldConfidenceJson;
+    }
+
+    public void setFieldConfidenceJson(String fieldConfidenceJson) {
+        this.fieldConfidenceJson = fieldConfidenceJson;
     }
 }

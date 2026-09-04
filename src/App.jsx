@@ -208,12 +208,25 @@ export default function App() {
     });
 
     setIsAnalyzing(true);
-    setAnalysisProgress(40);
-    setAnalysisStep('Uploading label & evaluating statutory declarations...');
+    setAnalysisProgress(25);
+    setAnalysisStep('Uploading label photograph...');
+
+    const stepTimer1 = setTimeout(() => {
+      setAnalysisProgress(60);
+      setAnalysisStep('Inspecting packaging declarations with Vision AI...');
+    }, 1200);
+
+    const stepTimer2 = setTimeout(() => {
+      setAnalysisProgress(85);
+      setAnalysisStep('Evaluating deterministic Legal Metrology rules...');
+    }, 3000);
 
     try {
       scanDebug('Calling scanLabel API with language:', language);
       const backendResponse = await scanLabel(fileToUpload, 'uploaded_label.jpg', language);
+      clearTimeout(stepTimer1);
+      clearTimeout(stepTimer2);
+
       scanDebug('scanLabel response received successfully', {
         scanId: backendResponse?.scanId,
         status: backendResponse?.status,
@@ -221,9 +234,8 @@ export default function App() {
         overallScore: backendResponse?.compliance?.overallScore
       });
 
-
       setAnalysisProgress(100);
-      setAnalysisStep('Inspection Complete!');
+      setAnalysisStep('Finalizing Inspection Memorandum...');
 
       scanDebug('Mapping backend response to product model...');
       const mappedProduct = mapBackendScanToProduct(backendResponse, customImage);

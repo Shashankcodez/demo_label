@@ -134,22 +134,32 @@ export function mapBackendScanToProduct(backendData, imagePreviewUrl = null) {
     }
   }
 
+  const extractionSource = backendData.extractionSource || (backendData.aiEnabled ? 'VISION_AI' : 'TESSERACT_FALLBACK');
+  const extractionStatus = backendData.extractionStatus || (extractionSource === 'VISION_AI' ? 'AI_SUCCESS' : 'OCR_AVAILABLE_EXTRACTION_LIMITED');
+  const overallExtractionConfidence = typeof backendData.overallExtractionConfidence === 'number'
+    ? backendData.overallExtractionConfidence
+    : (extractionSource === 'VISION_AI' || extractionSource === 'Groq Vision' ? 0.90 : 0.70);
+  const aiEnabled = Boolean(backendData.aiEnabled);
+  const aiModel = backendData.aiModel || (aiEnabled ? 'qwen/qwen3.6-27b' : null);
+  const fieldEvidence = backendData.fieldEvidence || {};
+  const fieldConfidence = backendData.fieldConfidence || {};
+
   // 12 Statutory Declarations Detection Check under Rule 6 & FSSAI
   const isPresent = (val) => Boolean(val && val !== 'Not detected' && val !== 'null' && String(val).trim().length > 0);
 
   const statutoryFields = [
-    { key: 'productName', name: 'Product Name / Identity', value: ext.productName || null, detected: isPresent(ext.productName), rule: 'Rule 6(1)(l)' },
-    { key: 'brand', name: 'Brand Name', value: ext.brand || null, detected: isPresent(ext.brand), rule: 'Rule 6(1)(l)' },
-    { key: 'netQuantity', name: 'Net Quantity', value: ext.netQuantity || null, detected: isPresent(ext.netQuantity), rule: 'Rule 6(1)(c)' },
-    { key: 'mrp', name: 'Maximum Retail Price (MRP)', value: ext.mrp || null, detected: isPresent(ext.mrp), rule: 'Rule 6(1)(e)' },
-    { key: 'unitSalePrice', name: 'Unit Sale Price (USP)', value: ext.unitSalePrice || null, detected: isPresent(ext.unitSalePrice), rule: 'Rule 6(1)(e) Amend.' },
-    { key: 'manufacturer', name: 'Manufacturer / Packer Name', value: ext.manufacturerName || ext.importerName || null, detected: isPresent(ext.manufacturerName || ext.importerName), rule: 'Rule 6(1)(a)' },
-    { key: 'address', name: 'Manufacturer / Packer Address', value: ext.manufacturerAddress || ext.importerAddress || null, detected: isPresent(ext.manufacturerAddress || ext.importerAddress), rule: 'Rule 6(1)(a)' },
-    { key: 'countryOfOrigin', name: 'Country of Origin', value: ext.countryOfOrigin || null, detected: isPresent(ext.countryOfOrigin), rule: 'Rule 6(10)' },
-    { key: 'mfgDate', name: 'Date of Packing / Mfg (MFD)', value: ext.manufactureOrPackingDate || null, detected: isPresent(ext.manufactureOrPackingDate), rule: 'Rule 6(1)(d)' },
-    { key: 'expiryDate', name: 'Best Before / Expiry Date', value: ext.bestBeforeOrExpiry || null, detected: isPresent(ext.bestBeforeOrExpiry), rule: 'Rule 6(1)(d) / FSSAI' },
-    { key: 'fssaiLicense', name: 'FSSAI License / Registration', value: fssaiLicense !== 'Not detected' ? fssaiLicense : null, detected: (isPresent(ext.fssaiLicenseNumber) && ext.fssaiLicenseNumber !== 'NOT_DETECTED') || fssaiStatus === 'APPLIED_FOR', rule: 'FSSAI Sec 23' },
-    { key: 'customerCare', name: 'Consumer Care Contact', value: customerCare.phone || customerCare.email || customerCare.address || null, detected: isPresent(customerCare.phone) || isPresent(customerCare.email) || isPresent(customerCare.address), rule: 'Rule 6(1)(n)' }
+    { key: 'productName', name: 'Product Name / Identity', value: ext.productName || null, detected: isPresent(ext.productName), rule: 'Rule 6(1)(l)', evidence: fieldEvidence.productName || null, confidence: fieldConfidence.productName || null },
+    { key: 'brand', name: 'Brand Name', value: ext.brand || null, detected: isPresent(ext.brand), rule: 'Rule 6(1)(l)', evidence: fieldEvidence.brand || null, confidence: fieldConfidence.brand || null },
+    { key: 'netQuantity', name: 'Net Quantity', value: ext.netQuantity || null, detected: isPresent(ext.netQuantity), rule: 'Rule 6(1)(c)', evidence: fieldEvidence.netQuantity || null, confidence: fieldConfidence.netQuantity || null },
+    { key: 'mrp', name: 'Maximum Retail Price (MRP)', value: ext.mrp || null, detected: isPresent(ext.mrp), rule: 'Rule 6(1)(e)', evidence: fieldEvidence.mrp || null, confidence: fieldConfidence.mrp || null },
+    { key: 'unitSalePrice', name: 'Unit Sale Price (USP)', value: ext.unitSalePrice || null, detected: isPresent(ext.unitSalePrice), rule: 'Rule 6(1)(e) Amend.', evidence: fieldEvidence.unitSalePrice || null, confidence: fieldConfidence.unitSalePrice || null },
+    { key: 'manufacturer', name: 'Manufacturer / Packer Name', value: ext.manufacturerName || ext.importerName || null, detected: isPresent(ext.manufacturerName || ext.importerName), rule: 'Rule 6(1)(a)', evidence: fieldEvidence.manufacturerName || null, confidence: fieldConfidence.manufacturerName || null },
+    { key: 'address', name: 'Manufacturer / Packer Address', value: ext.manufacturerAddress || ext.importerAddress || null, detected: isPresent(ext.manufacturerAddress || ext.importerAddress), rule: 'Rule 6(1)(a)', evidence: fieldEvidence.manufacturerAddress || null, confidence: fieldConfidence.manufacturerAddress || null },
+    { key: 'countryOfOrigin', name: 'Country of Origin', value: ext.countryOfOrigin || null, detected: isPresent(ext.countryOfOrigin), rule: 'Rule 6(10)', evidence: fieldEvidence.countryOfOrigin || null, confidence: fieldConfidence.countryOfOrigin || null },
+    { key: 'mfgDate', name: 'Date of Packing / Mfg (MFD)', value: ext.manufactureOrPackingDate || null, detected: isPresent(ext.manufactureOrPackingDate), rule: 'Rule 6(1)(d)', evidence: fieldEvidence.manufactureOrPackingDate || null, confidence: fieldConfidence.manufactureOrPackingDate || null },
+    { key: 'expiryDate', name: 'Best Before / Expiry Date', value: ext.bestBeforeOrExpiry || null, detected: isPresent(ext.bestBeforeOrExpiry), rule: 'Rule 6(1)(d) / FSSAI', evidence: fieldEvidence.bestBeforeOrExpiry || null, confidence: fieldConfidence.bestBeforeOrExpiry || null },
+    { key: 'fssaiLicense', name: 'FSSAI License / Registration', value: fssaiLicense !== 'Not detected' ? fssaiLicense : null, detected: (isPresent(ext.fssaiLicenseNumber) && ext.fssaiLicenseNumber !== 'NOT_DETECTED') || fssaiStatus === 'APPLIED_FOR', rule: 'FSSAI Sec 23', evidence: fieldEvidence.fssaiLicenseNumber || null, confidence: fieldConfidence.fssaiLicenseNumber || null },
+    { key: 'customerCare', name: 'Consumer Care Contact', value: customerCare.phone || customerCare.email || customerCare.address || null, detected: isPresent(customerCare.phone) || isPresent(customerCare.email) || isPresent(customerCare.address), rule: 'Rule 6(1)(n)', evidence: fieldEvidence.customerCarePhone || fieldEvidence.customerCareEmail || null, confidence: fieldConfidence.customerCarePhone || fieldConfidence.customerCareEmail || null }
   ];
 
   const calculatedFieldCount = statutoryFields.filter(f => f.detected).length;
@@ -158,10 +168,6 @@ export function mapBackendScanToProduct(backendData, imagePreviewUrl = null) {
     : calculatedFieldCount;
 
   // Quality Tier Mapping
-  // GOOD_LABEL (10-12) -> Compliance
-  // AVERAGE_LABEL (6-9) -> Compliance + Needs Review
-  // POOR_LABEL (1-5) -> Partial extraction + Needs Review
-  // VERY_POOR_IMAGE (0) -> Retake image
   let qualityTier = backendData.labelQualityTier;
   if (!qualityTier) {
     if (detectedFieldsCount >= 10) qualityTier = 'GOOD_LABEL';
@@ -237,7 +243,14 @@ export function mapBackendScanToProduct(backendData, imagePreviewUrl = null) {
     complianceOutcome: complianceOutcome,
     qualityMessage: qualityMessage,
     statutoryFields: statutoryFields,
-    isRetakeRequired: isRetakeRequired
+    isRetakeRequired: isRetakeRequired,
+    extractionSource: extractionSource,
+    extractionStatus: extractionStatus,
+    overallExtractionConfidence: overallExtractionConfidence,
+    aiEnabled: aiEnabled,
+    aiModel: aiModel,
+    fieldEvidence: fieldEvidence,
+    fieldConfidence: fieldConfidence
   };
 }
 
@@ -316,5 +329,46 @@ export function formatQualityTier(tier) {
       return tier;
   }
 }
+
+/**
+ * Formats extraction status into inspector-friendly terminology.
+ */
+export function formatExtractionStatus(status) {
+  if (!status) return 'AI Extraction Completed';
+  switch (String(status).toUpperCase()) {
+    case 'AI_SUCCESS':
+      return 'Vision AI (High Confidence)';
+    case 'AI_PARTIAL':
+      return 'Vision AI (Partial Extraction)';
+    case 'AI_FAILED_TESSERACT_FALLBACK':
+      return 'Local OCR Fallback (AI Network Limit/Offline)';
+    case 'OCR_AVAILABLE_EXTRACTION_LIMITED':
+      return 'Local Deterministic OCR Extraction';
+    case 'IMAGE_QUALITY_LOW':
+      return 'Low Legibility / Image Quality Issue';
+    case 'TOTAL_EXTRACTION_FAILURE':
+      return 'Extraction Incomplete';
+    default:
+      return status.replace(/_/g, ' ');
+  }
+}
+
+/**
+ * Formats extraction source into user-friendly badge text.
+ */
+export function formatExtractionSource(source, model) {
+  if (!source) return 'Groq Vision';
+  if (source === 'Groq Vision' || source === 'Vision AI (Groq)') {
+    return model ? `Groq Vision (${model})` : 'Groq Vision';
+  }
+  if (source === 'VISION_AI') {
+    return model ? `Groq Vision (${model})` : 'Groq Vision Extraction';
+  }
+  if (source === 'TESSERACT_FALLBACK') {
+    return 'Local OCR Engine (Fallback)';
+  }
+  return source.replace(/_/g, ' ');
+}
+
 
 

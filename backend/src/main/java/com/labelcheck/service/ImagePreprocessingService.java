@@ -341,5 +341,57 @@ public class ImagePreprocessingService {
                 ? (b3 << 24) | (b2 << 16) | (b1 << 8) | b0
                 : (b0 << 24) | (b1 << 16) | (b2 << 8) | b3;
     }
+
+    public record QualityAssessment(boolean isSuspect, String reason, int width, int height) {}
+
+    /**
+     * Performs a lightweight, non-blocking image quality assessment.
+     * Identifies extremely small, pitch-black, or completely washed-out images while never rejecting outright.
+     */
+    public QualityAssessment assessQuality(Path imagePath) {
+        if (imagePath == null || !Files.exists(imagePath)) {
+            return new QualityAssessment(true, "Image file not found", 0, 0);
+        }
+        try {
+            BufferedImage img = ImageIO.read(imagePath.toFile());
+            if (img == null) {
+                return new QualityAssessment(true, "Unreadable image format", 0, 0);
+            }
+            int w = img.getWidth();
+            int h = img.getHeight();
+            if (w < 80 || h < 80) {
+                return new QualityAssessment(true, "Image dimensions too small for legible packaging text (" + w + "x" + h + ")", w, h);
+            }
+
+            // Sample pixels to detect pitch-black or completely washed-out images
+            long totalBrightness = 0;
+            int stepX = Math.max(1, w / 20);
+            int stepY = Math.max(1, h / 20);
+            int sampleCount = 0;
+            for (int y = 0; y < h; y += stepY) {
+                for (int x = 0; x < w; x += stepX) {
+                    int rgb = img.getRGB(x, y);
+                    int r = (rgb >> 16) & 0xFF;
+                    int g = (rgb >> 8) & 0xFF;
+                    int b = rgb & 0xFF;
+                    totalBrightness += (r + g + b) / 3;
+                    sampleCount++;
+                }
+            }
+
+            double avgBrightness = sampleCount > 0 ? (double) totalBrightness / sampleCount : 128.0;
+            if (avgBrightness < 12.0) {
+                return new QualityAssessment(true, "Image is extremely dark or underexposed", w, h);
+            }
+            if (avgBrightness > 250.0) {
+                return new QualityAssessment(true, "Image is completely washed out / white overexposed", w, h);
+            }
+
+            return new QualityAssessment(false, "Sufficient legibility", w, h);
+        } catch (Exception e) {
+            log.warn("Image quality check failed gracefully: {}", e.getMessage());
+            return new QualityAssessment(false, "Quality check skipped", 0, 0);
+        }
+    }
 }
 

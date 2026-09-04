@@ -606,7 +606,6 @@ export default function ScannerPage({
             const isGood = preset.qualityTier === 'GOOD_LABEL' || preset.detectedFieldsCount >= 10;
             const isAverage = preset.qualityTier === 'AVERAGE_LABEL' || (preset.detectedFieldsCount >= 6 && preset.detectedFieldsCount < 10);
             const isPoor = preset.qualityTier === 'POOR_LABEL' || (preset.detectedFieldsCount >= 1 && preset.detectedFieldsCount < 6);
-            const isRetake = preset.isRetakeRequired || preset.detectedFieldsCount === 0 || preset.status === 'VERY_POOR_IMAGE';
 
             return (
               <div
